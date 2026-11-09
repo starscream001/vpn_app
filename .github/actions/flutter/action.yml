@@ -1,0 +1,14 @@
+name: Pinned Flutter SDK
+description: Bootstrap the same Flutter source revision used for local validation
+runs:
+  using: composite
+  steps:
+    - shell: bash
+      run: |
+        git init "$RUNNER_TEMP/foxway-flutter"
+        git -C "$RUNNER_TEMP/foxway-flutter" remote add origin https://github.com/flutter/flutter.git
+        git -C "$RUNNER_TEMP/foxway-flutter" fetch --depth 1 origin c197ca5199e9ee5661e865596c9c07294dfab51c
+        git -C "$RUNNER_TEMP/foxway-flutter" checkout --detach FETCH_HEAD
+        echo "$RUNNER_TEMP/foxway-flutter/bin" >> "$GITHUB_PATH"
+    - shell: bash
+      run: flutter --version

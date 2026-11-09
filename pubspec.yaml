@@ -1,0 +1,27 @@
+name: foxway
+description: FoxWay VPN client
+publish_to: none
+version: 0.1.0+1
+environment:
+  sdk: '>=3.8.0 <4.0.0'
+dependencies:
+  flutter:
+    sdk: flutter
+  flutter_v2ray: 2.0.0
+  flutter_secure_storage: ^9.2.4
+  crypto: ^3.0.6
+  file_selector: ^1.0.3
+  url_launcher: ^6.3.1
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/fox-icon.png
+    - assets/fox-mountains.jpg
+  fonts:
+    - family: Inter
+      fonts:
+        - asset: assets/inter.ttf
