@@ -15,6 +15,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
 
+    packaging {
+        resources.pickFirsts.add("META-INF/versions/9/OSGI-INF/MANIFEST.MF")
+    }
+
     defaultConfig {
         // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
         applicationId = "app.foxway.foxway"

@@ -38,6 +38,7 @@ jobs:
           java-version: '21'
       - uses: ./.github/actions/flutter
       - run: flutter pub get --enforce-lockfile
+      - run: sdkmanager "cmake;3.22.1"
       - run: flutter build apk --debug
       - run: flutter build apk --release
       - run: flutter build appbundle --release

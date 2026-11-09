@@ -9,6 +9,8 @@ runs:
         git -C "$RUNNER_TEMP/foxway-flutter" remote add origin https://github.com/flutter/flutter.git
         git -C "$RUNNER_TEMP/foxway-flutter" fetch --depth 1 origin c197ca5199e9ee5661e865596c9c07294dfab51c
         git -C "$RUNNER_TEMP/foxway-flutter" checkout --detach FETCH_HEAD
+        git -C "$RUNNER_TEMP/foxway-flutter" tag 3.47.9
+        git -C "$RUNNER_TEMP/foxway-flutter" checkout -b stable
         echo "$RUNNER_TEMP/foxway-flutter/bin" >> "$GITHUB_PATH"
     - shell: bash
       run: flutter --version
