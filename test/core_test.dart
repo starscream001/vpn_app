@@ -357,4 +357,66 @@ void main() {
       c.dispose();
     },
   );
+  test(
+    'revocation survives restart and rejects stale catalog replay',
+    () async {
+      final vault = MemoryVault();
+      final c = FoxController(
+        store: StateStore(vault),
+        engine: FakeEngine(),
+        probe: FakeProbe([]),
+      );
+      await c.init();
+      final paid = {
+        ...parseProfiles(link).single.toJson(),
+        'id': 'paid',
+        'expiresAt': '2099-01-01T00:00:00Z',
+      };
+      await c.applyCatalog({
+        'schema': 1,
+        'profiles': [paid],
+      });
+      expect(c.profiles.length, 1);
+      await c.applyCatalog({
+        'schema': 1,
+        'profiles': [],
+        'revoked_ids': ['paid'],
+      });
+      expect(c.profiles, isEmpty);
+      c.dispose();
+      final restored = FoxController(
+        store: StateStore(vault),
+        engine: FakeEngine(),
+        probe: FakeProbe([]),
+      );
+      await restored.init();
+      await restored.applyCatalog({
+        'schema': 1,
+        'profiles': [paid],
+      });
+      expect(restored.profiles, isEmpty);
+      restored.dispose();
+    },
+  );
+  test('malformed catalog cannot partially replace working profiles', () async {
+    final c = FoxController(
+      store: StateStore(MemoryVault()),
+      engine: FakeEngine(),
+      probe: FakeProbe([]),
+    );
+    await c.init();
+    await c.importText(link);
+    final before = c.profiles.single.config;
+    await expectLater(
+      c.applyCatalog({
+        'schema': 1,
+        'profiles': [
+          {'id': 'broken'},
+        ],
+      }),
+      throwsA(anything),
+    );
+    expect(c.profiles.single.config, before);
+    c.dispose();
+  });
 }

@@ -141,13 +141,14 @@ class HttpsProbe implements QualityProbe {
         received += chunk.length;
         if (received > 65536) break;
       }
+      final latency = sw.elapsedMilliseconds;
       await Future<void>.delayed(const Duration(milliseconds: 1100));
       final after = await engine.traffic();
       final rx = after.rx - before.rx, tx = after.tx - before.tx;
       final ok = res.statusCode == 204 && after.up && rx > 0 && tx > 0;
       return ProbeResult(
         ok,
-        sw.elapsedMilliseconds,
+        latency,
         rx < 0 ? 0 : rx,
         tx < 0 ? 0 : tx,
         ok ? 'https_204' : 'route_or_response_failed',

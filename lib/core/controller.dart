@@ -18,6 +18,8 @@ class FoxController extends ChangeNotifier {
   final TunnelEngine engine;
   final QualityProbe probe;
   List<Profile> profiles = [];
+  Set<String> revokedIds = {};
+  DateTime? _lastRefresh;
   RoutingPolicy routing = const RoutingPolicy();
   Protocol mode = Protocol.auto;
   ConnectionState state = ConnectionState.disconnected;
@@ -41,6 +43,7 @@ class FoxController extends ChangeNotifier {
         Map<String, dynamic>.from(j['routing'] ?? {}),
       );
       mode = Protocol.values.byName(j['mode'] as String? ?? 'auto');
+      revokedIds = Set<String>.from(j['revokedIds'] ?? []);
       selectedId = j['selectedId'] as String?;
       apiUrl = j['apiUrl'] as String?;
       token = j['token'] as String?;
@@ -73,6 +76,7 @@ class FoxController extends ChangeNotifier {
 
   Future<void> save() {
     final snapshot = {
+      'revokedIds': revokedIds.toList(),
       'profiles': profiles.map((p) => p.toJson()).toList(),
       'routing': routing.toJson(),
       'mode': mode.name,
@@ -146,6 +150,11 @@ class FoxController extends ChangeNotifier {
       requireHttps(apiUrl!),
       token: token,
     ).request('/v1/catalog');
+    await applyCatalog(res);
+    _lastRefresh = DateTime.now();
+  }
+
+  Future<void> applyCatalog(Map<String, dynamic> res) async {
     if (res['schema'] != 1 || res['profiles'] is! List) {
       throw const FormatException('Неверный каталог');
     }
@@ -162,14 +171,18 @@ class FoxController extends ChangeNotifier {
       }
       return p;
     }).toList();
-    final revoked = Set<String>.from(res['revoked_ids'] ?? []);
+    revokedIds.addAll(Set<String>.from(res['revoked_ids'] ?? []));
+    revokedIds.addAll(incoming.where((p) => p.revoked).map((p) => p.id));
     profiles = mergeCatalog(
       profiles,
       incoming,
-      revokedIds: revoked,
+      revokedIds: revokedIds,
       now: DateTime.now(),
     );
-    if (active != null && !profiles.any((p) => p.id == active!.id)) {
+    if (active != null &&
+        !profiles.any(
+          (p) => p.id == active!.id && p.config == active!.config,
+        )) {
       await disconnect();
     }
     await save();
@@ -267,6 +280,16 @@ class FoxController extends ChangeNotifier {
     if (_busy || _polling || !ready) return;
     _polling = true;
     try {
+      if (apiUrl != null &&
+          token != null &&
+          (_lastRefresh == null ||
+              DateTime.now().difference(_lastRefresh!).inMinutes >= 15)) {
+        // Failed refresh retains cached catalog and throttles the next retry.
+        _lastRefresh = DateTime.now();
+        try {
+          await refresh();
+        } catch (_) {}
+      }
       profiles.removeWhere((p) => !p.usable(DateTime.now()));
       if (active != null) {
         if (!profiles.any((p) => p.id == active!.id)) {

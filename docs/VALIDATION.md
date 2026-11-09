@@ -4,7 +4,7 @@
 
 - Flutter 3.47.9 / Dart 3.13.7 установлен в изолированный рабочий каталог.
 - `flutter analyze`: без замечаний.
-- `flutter test --coverage`: 27 тестов прошли, включая 390×844, 844×390, 1100×800, текст 200% и reduced motion.
+- `flutter test --coverage`: 29 тестов прошли, включая 390×844, 844×390, 1100×800, текст 200% и reduced motion.
 - `python3 -m unittest discover -s backend -v`: 5 тестов прошли.
 - Android debug build: успешно, `build/app/outputs/flutter-apk/app-debug.apk`. Найдены и исправлены конфликт Java resources и отсутствие CMake 3.22.1. Использованы Java 21, SDK 36, NDK 28.2.13676358. Исходная Java 11 несовместима; выбор Java 21 решает это.
 - Xcode: доступен только `/Library/Developer/CommandLineTools`; локальная iOS/macOS компиляция невозможна без полного Xcode. Настроены Actions на macOS.
@@ -25,3 +25,5 @@
 В CI Flutter загружается из исходников фиксированного commit `c197ca5199e9ee5661e865596c9c07294dfab51c`: публичный JSON index архивов SDK в текущей сети возвращает HTTP 404. Использован тот же способ bootstrap, что успешно выполнен локально.
 
 Первый CI run 42714390770 выявил, что shallow checkout SDK без semver tag определяется как Flutter 0.0.0-unknown. Исправлен bootstrap: фиксированный upstream commit помечается соответствующим ему тегом 3.47.9 и stable branch. Lockfile enforcement сохранён.
+
+Android release APK также собран локально (universal, 191.8 MB по Flutter). Для удобства добавлена отдельная arm64 сборка через --split-per-abi. Второй run 42714840462 прошёл checks; macOS 14 runner больше не поддерживается (удалён GitHub 2 ноября 2026). Workflow переведён на macOS 15.
