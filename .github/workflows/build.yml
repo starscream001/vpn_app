@@ -39,6 +39,9 @@ jobs:
       - uses: ./.github/actions/flutter
       - run: flutter pub get --enforce-lockfile
       - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
       - run: sdkmanager "cmake;3.22.1"
       - run: flutter build apk --debug
       - run: flutter build apk --release
