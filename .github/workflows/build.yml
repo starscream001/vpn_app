@@ -8,7 +8,7 @@ permissions:
   contents: read
 concurrency:
   group: foxway-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
   checks:
     runs-on: ubuntu-latest
@@ -38,6 +38,7 @@ jobs:
           java-version: '21'
       - uses: ./.github/actions/flutter
       - run: flutter pub get --enforce-lockfile
+      - uses: android-actions/setup-android@v3
       - run: sdkmanager "cmake;3.22.1"
       - run: flutter build apk --debug
       - run: flutter build apk --release

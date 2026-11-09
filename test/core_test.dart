@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:foxway/core/api.dart';
 import 'package:foxway/core/controller.dart';
@@ -74,6 +75,12 @@ class FakeProbe implements QualityProbe {
       ok ? 'https_204' : 'https_failed',
     );
   }
+}
+
+class DelayedProbe implements QualityProbe {
+  final result = Completer<ProbeResult>();
+  @override
+  Future<ProbeResult> check(TunnelEngine engine) => result.future;
 }
 
 void main() {
@@ -419,4 +426,31 @@ void main() {
     expect(c.profiles.single.config, before);
     c.dispose();
   });
+  test(
+    'manual disconnect during quality check cannot trigger auto reconnect',
+    () async {
+      final probe = DelayedProbe(), engine = FakeEngine();
+      final c = FoxController(
+        store: StateStore(MemoryVault()),
+        engine: engine,
+        probe: probe,
+      );
+      await c.init();
+      await c.importText(link);
+      c.active = c.profiles.single;
+      c.state = ConnectionState.connected;
+      c.failures = 2;
+      c.lastSwitch = DateTime.now().subtract(const Duration(minutes: 3));
+      engine.up = true;
+      final polling = c.poll();
+      await Future<void>.delayed(Duration.zero);
+      await c.disconnect();
+      probe.result.complete(const ProbeResult(false, 0, 0, 0, 'https_failed'));
+      await polling;
+      expect(engine.starts, 0);
+      expect(c.state, ConnectionState.disconnected);
+      expect(c.active, isNull);
+      c.dispose();
+    },
+  );
 }

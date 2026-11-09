@@ -27,6 +27,7 @@ class FoxController extends ChangeNotifier {
   Profile? active;
   bool ready = false, telemetry = false;
   int failures = 0;
+  int _session = 0;
   Traffic traffic = const Traffic(0, 0, false);
   DateTime? lastSwitch;
   Timer? _timer;
@@ -221,6 +222,7 @@ class FoxController extends ChangeNotifier {
   Future<void> connect({String? skipId}) async {
     if (_busy || !ready) return;
     _busy = true;
+    _session++;
     error = null;
     state = ConnectionState.connecting;
     notifyListeners();
@@ -233,7 +235,7 @@ class FoxController extends ChangeNotifier {
       if (candidates.isEmpty) throw StateError('Добавьте профиль или подписку');
       for (final p in candidates) {
         try {
-          await engine.start(p, routing).timeout(const Duration(seconds: 25));
+          await engine.start(p, routing);
           state = ConnectionState.checking;
           notifyListeners();
           final result = await probe.check(engine);
@@ -269,6 +271,7 @@ class FoxController extends ChangeNotifier {
 
   Future<void> disconnect() async {
     if (_busy) return;
+    _session++;
     await engine.stop();
     active = null;
     traffic = const Traffic(0, 0, false);
@@ -298,7 +301,9 @@ class FoxController extends ChangeNotifier {
           return;
         }
         final p = active!;
+        final session = _session;
         final r = await probe.check(engine);
+        if (session != _session || active?.id != p.id) return;
         await _record(p, r);
         traffic = await engine.traffic();
         failures = r.ok ? 0 : failures + 1;
