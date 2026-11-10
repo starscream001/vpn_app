@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'dart:ffi' show Abi;
 import 'dart:math';
 import 'package:sing_box/sing_box.dart';
 import 'package:flutter/services.dart';
@@ -147,7 +148,7 @@ class DesktopVlessEngine implements TunnelEngine, ProxyProbeEngine {
     final folder = File(Platform.resolvedExecutable).parent.path;
     final binary =
         Platform.environment['FOXWAY_SING_BOX_BINARY'] ??
-        '$folder${Platform.pathSeparator}sing-box${Platform.isWindows ? '.exe' : ''}';
+        '$folder${Platform.pathSeparator}${Platform.isMacOS ? (Abi.current() == Abi.macosArm64 ? 'sing-box-arm64' : 'sing-box-amd64') : (Platform.isWindows ? 'sing-box.exe' : 'sing-box')}';
     if (!await File(binary).exists()) {
       throw StateError(
         'В сборке нет sing-box. Переустановите полный desktop архив.',

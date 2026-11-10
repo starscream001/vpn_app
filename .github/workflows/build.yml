@@ -115,15 +115,19 @@ jobs:
         shell: bash
         run: |
           if [ "${{ matrix.target }}" = "macos" ]; then
-            python3 scripts/install_desktop_core.py "build/macos/Build/Products/Release/FoxWay VPN.app/Contents/MacOS"
+            python3 scripts/install_desktop_core.py "build/macos/Build/Products/Release/FoxWay VPN.app/Contents/MacOS" arm64
+            python3 scripts/install_desktop_core.py "build/macos/Build/Products/Release/FoxWay VPN.app/Contents/MacOS" amd64
             codesign --force --deep --sign - "build/macos/Build/Products/Release/FoxWay VPN.app"
           else
             python3 scripts/install_desktop_core.py "${{ matrix.path }}"
           fi
+      - name: Preserve Apple bundle symlinks and executable permissions
+        if: matrix.target == 'macos'
+        run: ditto -c -k --sequesterRsrc --keepParent "build/macos/Build/Products/Release/FoxWay VPN.app" build/FoxWay-macos-unsigned-AWG-VLESS.zip
       - uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.target }}-AWG-VLESS-experimental
-          path: ${{ matrix.path }}
+          path: ${{ matrix.target == 'macos' && 'build/FoxWay-macos-unsigned-AWG-VLESS.zip' || matrix.path }}
   ios:
     needs: checks
     runs-on: macos-15
@@ -139,10 +143,11 @@ jobs:
         run: |
           make -C native/amnezia-apple/Sources/WireGuardKitGo PLATFORM_NAME=iphoneos ARCHS=arm64 SDKROOT="$(xcrun --sdk iphoneos --show-sdk-path)" DESTDIR="$PWD/native/amnezia-apple/Sources/WireGuardKitGo/out" DEPLOYMENT_TARGET_CLANG_FLAG_NAME=miphoneos-version-min DEPLOYMENT_TARGET_CLANG_ENV_NAME=IPHONEOS_DEPLOYMENT_TARGET IPHONEOS_DEPLOYMENT_TARGET=15.0
       - run: flutter build ios --release --no-codesign
+      - run: ditto -c -k --keepParent build/ios/iphoneos/Runner.app build/FoxWay-iOS-unsigned-AWG-VLESS.zip
       - uses: actions/upload-artifact@v4
         with:
           name: iOS-unsigned-AWG-VLESS-experimental
-          path: build/ios/iphoneos/Runner.app
+          path: build/FoxWay-iOS-unsigned-AWG-VLESS.zip
 
   sources:
     needs: checks
@@ -159,4 +164,5 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: corresponding-source
+          compression-level: 0
           path: build/FoxWay-corresponding-source.tar.gz

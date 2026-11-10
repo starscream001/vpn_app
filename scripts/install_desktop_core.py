@@ -11,6 +11,9 @@ import zipfile
 
 osname = {'Darwin':'darwin','Windows':'windows','Linux':'linux'}[platform.system()]
 arch = 'arm64' if platform.machine().lower() in ('arm64','aarch64') else 'amd64'
+if len(sys.argv) > 2:
+    arch = sys.argv[2]
+    if arch not in ('arm64', 'amd64'): raise ValueError('Unsupported arch')
 assets = json.loads(Path(__file__).with_name('sing_box_assets.json').read_text())
 asset = assets[f'{osname}-{arch}']
 with urllib.request.urlopen(asset['url'], timeout=120) as response:
@@ -29,5 +32,5 @@ else:
         if len(entries) != 1: raise RuntimeError('Unexpected upstream archive')
         binary = archive.extractfile(entries[0]).read()
 folder = Path(sys.argv[1]);folder.mkdir(parents=True,exist_ok=True)
-target = folder / name;target.write_bytes(binary);target.chmod(0o755)
+target = folder / (f'sing-box-{arch}' if osname == 'darwin' and len(sys.argv) > 2 else name);target.write_bytes(binary);target.chmod(0o755)
 print(f'Verified sing-box 1.14.4: {target}')

@@ -19,6 +19,16 @@ for platform in ('windows', 'linux', 'macos', 'iOS'):
     if len(directories) != 1:
         raise RuntimeError(f'Expected exactly one {platform} artifact')
     source = directories[0]
+    if platform in ('macos', 'iOS'):
+        # ditto archives were created on Apple runners before artifact transport.
+        archives = list(source.glob('*.zip'))
+        if len(archives) != 1: raise RuntimeError('Expected preserved Apple bundle')
+        target = out / archives[0].name
+        shutil.copy2(archives[0], target)
+        with zipfile.ZipFile(target, 'a') as archive:
+            for notice in [Path('LICENSE'), *Path('docs').glob('LICENSE*'), Path('docs/SOURCES.md'), Path('docs/NATIVE_VPN.md')]:
+                archive.write(notice, 'FoxWay-notices/' + notice.name)
+        continue
     for file in source.rglob('*'):
         if file.is_file() and (file.name in ('foxway', 'sing-box', 'awg', 'awg-quick', 'amneziawg-go') or file.parent.name == 'MacOS' or file.suffix in ('.so', '.dylib')):
             file.chmod(0o755)
