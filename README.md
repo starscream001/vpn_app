@@ -36,6 +36,10 @@ flutter build apk --debug
 
 GitHub Actions сохраняет Android APK/AAB с тестовой подписью, desktop bundles и неподписанный Runner.app iOS. Это тестовые артефакты, не установщики для магазинов. Для выпуска обязательно заменить Android signing config и сохранить release keystore: смена подписи нарушает обновления и доступ к прежним данным.
 
+## Проверенные сборки
+
+[GitHub Actions: все jobs успешны](https://github.com/starscream001/vpn_app/actions/runs/42716650329). 30 Flutter tests + 5 backend tests, Android APK/AAB, Windows/Linux/macOS release bundles и iOS unsigned. Это подтверждение сборки; границы VPN-поддержки указаны выше. [Точные результаты и артефакты](docs/VALIDATION.md).
+
 ## Документация
 
 - [Архитектура и сценарии](docs/ARCHITECTURE.md)

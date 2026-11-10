@@ -1,35 +1,56 @@
-# Проверки и ограничения
+# Итоговые проверки — 10 ноября 2026
 
-Дата: 10 ноября 2026. Проверки выполняются в ходе реализации; окончательные результаты CI будут записаны следующим коммитом.
+Проверенный commit: `eded064f66e92e5731f3196fd17791577b790bc1`. [Финальный GitHub Actions run](https://github.com/starscream001/vpn_app/actions/runs/42716650329) — **success**. Все шесть jobs завершены успешно; артефакты реально загружены.
 
-- Flutter 3.47.9 / Dart 3.13.7 установлен в изолированный рабочий каталог.
-- `flutter analyze`: без замечаний.
-- `flutter test --coverage`: 30 тестов прошли, включая 390×844, 844×390, 1100×800, текст 200% и reduced motion.
-- `python3 -m unittest discover -s backend -v`: 5 тестов прошли.
-- Android debug build: успешно, `build/app/outputs/flutter-apk/app-debug.apk`. Найдены и исправлены конфликт Java resources и отсутствие CMake 3.22.1. Использованы Java 21, SDK 36, NDK 28.2.13676358. Исходная Java 11 несовместима; выбор Java 21 решает это.
-- Xcode: доступен только `/Library/Developer/CommandLineTools`; локальная iOS/macOS компиляция невозможна без полного Xcode. Настроены Actions на macOS.
-- Windows/Linux: проверяются на соответствующих runners, локальный host macOS их не компилирует.
+| Проверка | Результат |
+|---|---|
+| Dart format / flutter analyze | PASS, без замечаний |
+| Flutter unit/widget tests | 30 PASS |
+| Backend unit tests | 5 PASS |
+| Android | debug APK, universal release APK, три ABI APK и AAB — PASS |
+| Windows x64 | release bundle — PASS |
+| Linux x64 | release bundle — PASS |
+| macOS | release app bundle — PASS |
+| iOS | release --no-codesign Runner.app — PASS |
 
-Настоящие AWG/VLESS-сессии не выполнялись: отдельный тестовый VPN endpoint и устройство не предоставлены. Действующие VPN-серверы не менялись, существующие VPN-подключения компьютера не переключались. Успешный тест с fake engine проверяет state machine, а не совместимость реального протокола.
+## Артефакты финального прогона
 
-## Обязательный ручной стенд перед релизом
+- [Android APK/AAB, тестовая подпись](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13718757836)
+- [Windows UI preview](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13719675087)
+- [Linux UI preview](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13719390345)
+- [macOS UI preview](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13719630443)
+- [iOS unsigned UI preview](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13719315917)
+- [Coverage и снимок интерфейса](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13717579703)
 
-- AWG 2.0: S1–S4, H1–H4 ranges, I1–I5, handshake, HTTPS и RX/TX, DNS, IPv4/IPv6.
-- VLESS TCP Reality: SNI/public key/short id/flow, HTTPS по принудительному proxy inbound, отказ при неверном ключе.
-- Android: VPN consent/отказ, background/sleep, notification stop, Wi-Fi→LTE→Wi-Fi, airplane mode, перезапуск процесса, обновление APK той же подписью.
-- Исключённое приложение идёт напрямую; включённое через VPN. Домены .ru/.рф/.su и ручные исключения VLESS идут напрямую, остальные через VPN. Проверить ECH/CDN/IPv6/QUIC и утечки DNS отдельно.
-- Отзыв профиля и expiry отключают платный профиль; offline refresh оставляет рабочую конфигурацию; сторонние профили не зависят от FoxWay оплаты.
-- Очередь отчётов сохраняется при HTTP 500/offline, отправляется после восстановления, выключение очищает. На сервере нет ключей, URL или списка приложений.
-- iOS: после реализации extension — device install/TestFlight, VPN entitlements и подписи обоих targets; unsigned Runner.app этого не проверяет.
+Артефакты Actions истекают 7 февраля 2027 по данным GitHub; скачивание может требовать входа. Android arm64 APK около 70.9 MB, armeabi-v7a 66.7 MB, x86_64 75.2 MB, universal 191.8 MB, AAB 120.7 MB (Flutter output). Подписи тестовые. Для будущих обновлений из магазина обязателен постоянный release keystore.
 
-В CI Flutter загружается из исходников фиксированного commit `c197ca5199e9ee5661e865596c9c07294dfab51c`: публичный JSON index архивов SDK в текущей сети возвращает HTTP 404. Использован тот же способ bootstrap, что успешно выполнен локально.
+## Локальные проверки
 
-Первый CI run 42714390770 выявил, что shallow checkout SDK без semver tag определяется как Flutter 0.0.0-unknown. Исправлен bootstrap: фиксированный upstream commit помечается соответствующим ему тегом 3.47.9 и stable branch. Lockfile enforcement сохранён.
+Flutter 3.47.9 / Dart 3.13.7, Java 21, Android SDK 36, NDK 28.2.13676358, CMake 3.22.1. Те же 30 Flutter и 5 backend tests прошли локально, анализатор без замечаний. Android debug/release, три ABI APK и AAB также собраны локально.
 
-Android release APK также собран локально (universal, 191.8 MB по Flutter). Для удобства добавлена отдельная arm64 сборка через --split-per-abi. Второй run 42714840462 прошёл checks; macOS 14 runner больше не поддерживается (удалён GitHub 2 ноября 2026). Workflow переведён на macOS 15.
+Отдельный HTTP smoke на временном loopback стенде подтвердил: обмен одноразового кода → авторизованный каталог → сохранение отчёта в SQLite. Использовались фикстуры, не настоящий Telegram и не действующие VPN-серверы.
 
-Финальная локальная проверка: 30 Flutter tests + 5 backend tests PASS; flutter analyze без замечаний; отдельный loopback HTTP smoke (exchange/catalog/report persistence) PASS. Исправлена гонка, при которой окончание quality probe после ручного отключения могло вызвать автоподключение; есть регрессионный тест. Ожидание системного VPN consent больше не обрывается внешним timeout с продолжением старого native start.
+Widget tests: 390×844, 844×390, 1100×800, текст 200% и reduced motion. Снимок главной страницы просмотрен визуально. Проверяются импорт, AWG 2 поля, Reality, запрет hooks/insecure TLS, partial refresh, expiry/revocation, сохранение tombstone после перезапуска, неверный каталог, очередь и приватность отчётов, ручной disconnect во время quality probe.
 
-Собраны release APK для armeabi-v7a (66.7 MB), arm64-v8a (70.9 MB), x86_64 (75.2 MB), и AAB (120.7 MB), значения из Flutter output. Для AAB потребовалась корректная физическая установка cmdline-tools в изолированный SDK, не symlink за пределы SDK: apkanalyzer иначе не находил SDK. С защитами stripping всё успешно; обход проверки не использовался.
+## Исправленные проблемы сборки
 
-Run 42715189688: checks, Windows, Linux и iOS unsigned успешно. macOS ещё выполняется. Android CI выявил отсутствие sdkmanager в PATH; добавлен setup-android перед установкой CMake. Результат следующего прогона будет записан отдельно. CI не отменяет уже запущенные сборки при следующем push, чтобы не терять результаты долгих Apple-сборок.
+1. Hiddify исключён из основы из-за опубликованных NonCommercial/дополнительных условий; использованы независимые библиотеки.
+2. Shallow checkout Flutter в CI без semver tag определял SDK как 0.0.0-unknown. У фиксированного upstream commit восстановлены соответствующий tag 3.47.9 и stable branch. Проверка lockfile сохранена.
+3. macOS 14 runners удалены GitHub 2 ноября 2026; использован macOS 15.
+4. Явно настроены Android SDK и CMake. Setup action больше не пытается установить удалённый Google пакет `tools`.
+5. Устранён конфликт META-INF OSGI manifest в Java dependency packaging.
+6. Локальный apkanalyzer требовал физически корректный SDK layout и Java 21. AAB stripping check пройден без отключения проверок.
+
+CI runs до финального результата сохраняют историю ошибок; итоговый run выше зелёный. Документационный коммит после него помечен skip ci: исходный код приложения и workflow после проверенного SHA не меняются.
+
+## Непроверенное и отсутствующее
+
+Реальное VPN-подключение не выполнялось: отдельное тестовое устройство и тестовый endpoint не предоставлены. Наличие настоящих адаптеров, успешная компиляция и fake-engine tests не доказывают совместимость с выдаваемыми вами профилями. Нужен Android-стенд AWG 2.0/VLESS Reality, DNS/IPv6 leak checks, split routing, Wi-Fi/LTE, sleep/background, процесс/revoke/expiry и обновление с той же подписью.
+
+iOS/desktop — **интерфейс, импорт и хранилище без системного VPN**; на этих платформах кнопка VPN отключена. Network Extension и desktop privileged helpers ещё предстоит реализовать. iOS unsigned не является установочным IPA/TestFlight.
+
+Российские домены напрямую реализованы только для VLESS (.ru/.рф/.su + ручные домены); AWG IP/DNS route manager отсутствует. ECH/CDN и российские сайты на других доменах требуют отдельных правил и тестов.
+
+Настоящий API бота и quality collector не развёрнуты; контракт и reference backend готовы. Не реализованы QR/vpn://, полноценный native always-on/kill switch, native state reconciliation после перезапуска, фоновые проверки во сне, светлая тема и EN. Перед коммерческим распространением нужен полный binary license/SBOM аудит, production signing и проверка 16 KB native pages.
+
+Действующие VPN-серверы и подключения компьютера не изменялись. Реальные платежи, публикация в магазинах и доступ к Telegram bot token не выполнялись.
