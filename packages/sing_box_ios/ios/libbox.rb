@@ -42,7 +42,7 @@ module SingBoxLibbox
 
       actual = Digest::SHA256.file(zip).hexdigest
       unless actual == checksum
-        Pod::UI.warn("sing_box: #{zip} sha256 #{actual} differs from Package.swift (#{checksum}); using it anyway") if defined?(Pod::UI)
+        raise "sing_box: local XCFramework checksum mismatch; refusing unverified binary"
       end
     end
     unpack(zip, File.dirname(target))

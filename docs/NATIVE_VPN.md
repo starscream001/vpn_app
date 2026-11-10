@@ -1,30 +1,34 @@
 # Native VPN 0.2.0 — экспериментальная интеграция
 
-## Реализовано в коде
+| Платформа | VLESS TCP Reality/TLS | AmneziaWG 2.0 | Исключения |
+|---|---|---|---|
+| Android | Xray | AWG Android 2.3.7 | Приложения: оба движка; домены: VLESS |
+| iOS 15+ | sing-box/libbox PacketTunnel | Отдельный AWGPacketTunnel, официальный Go bridge | Домены: VLESS; выбор приложений не реализован |
+| Windows x64 | sing-box TUN | Официальный AWG service через собственный controller | Домены: VLESS |
+| Linux x64 | sing-box TUN | AWG Go + ограниченный awg-quick | Домены: VLESS |
+| macOS | sing-box TUN process | Отдельный AWG Network Extension | Домены: VLESS |
 
-- iOS 15+: PacketTunnel Xcode target, App Group, entitlements, SingBoxTunnel pod, настоящий NEPacketTunnelProvider через GPL sing_box/libbox. Приложение управляет native start/stop/status/stats напрямую, без высокоуровневого сохранения профилей сторонним Dart SDK.
-- Windows/Linux/macOS: отдельный официальный sing-box 1.14.4 с TUN (IPv4/IPv6, DNS hijacking), конфигурация передаётся stdin, не пишется в файл и не попадает в аргументы процесса. Core поставляется рядом с executable; URL и SHA-256 закреплены. Не используется системный HTTP proxy вместо TUN.
-- VLESS TCP Reality/TLS, ручные доменные исключения и ru/рф/su, HTTPS-проверка и native counters. На desktop проба принудительно идёт через отдельный HTTP inbound, даже если домен добавлен в исключения. Clash API только loopback, случайный секрет на каждый запуск.
-- Android по-прежнему использует исходные AWG/Xray адаптеры.
+Это матрица реализации, а не подтверждение реальных VPN-подключений. Без отдельного тестового сервера проверяем компиляцию, логику и локальные fixtures. Настоящие TUN, DNS/IPv6 и переподключение на устройствах ещё не проверены.
 
-## Что требуется для запуска
+## Передача конфигурации
 
-**iOS:** платный Apple Developer аккаунт, bundle IDs app.foxway.foxway и app.foxway.foxway.PacketTunnel, App Group group.app.foxway.foxway, provisioning и Network Extension entitlement у обоих targets. Unsigned build проверяет компиляцию, не устанавливается на iPhone. Настоящее подключение требует физического устройства и тестового endpoint.
+- Desktop VLESS: официальный sing-box 1.14.4, URL и SHA-256 закреплены; конфигурация через stdin, без ключей в командной строке или файлах. Loopback Clash API защищён случайным секретом. HTTPS-проба принудительно идёт через отдельный proxy inbound.
+- Apple AWG: отдельный процесс расширения исключает конфликт двух Go runtimes. Конфигурация в общем Keychain, в NE preferences только account ID; расширение возвращает только счётчики. Предыдущая default Keychain access group сохранена первой для обновлений vault.
+- Windows AWG: собственный короткоживущий helper вызывает официальный upstream service. Профиль зашифрован Windows DPAPI machine scope в каталоге Program Files с доступом SYSTEM/Administrators. Сервис создаётся с demand start, имя привязано к пользователю, executable размещается в защищённом каталоге версии. Hooks из импортированных конфигов запрещены. Полный GUI в этом preview запрашивает административные права; разделение прав через подписанный broker остаётся следующим этапом.
+- Linux AWG: только stdin и собственное имя интерфейса `fw` + hash UID; raw-конфиги на диск не записываются. Hooks и SaveConfig запрещены. Используется системный диалог pkexec для awg-quick; требуются iproute2, resolvconf, iptables или nftables, polkit/pkexec и /dev/net/tun. Бинарники AWG поставляются в bundle. Не запускайте несколько VPN одновременно: upstream route/DNS scripts не обеспечивают изоляцию произвольных сторонних VPN.
 
-**Desktop:** создание TUN и изменение маршрутов требуют OS privileges. Текущий process adapter сам не повышает права и не устанавливает сервис. Без прав он завершится с ошибкой, а UI не покажет «Подключено». На Linux можно отдельно предоставить cap_net_admin доверенному core; на Windows требуется административный запуск; на macOS требуется привилегированный backend. Полноценные установщики signed privileged helpers/XPC/Windows service ещё не реализованы. GUI не следует распространять как законченный потребительский desktop VPN без этого этапа. macOS build предназначен для прямой загрузки, App Sandbox выключен в конфигурации приложения; App Store вариант потребует отдельного Network Extension.
+## Права и подпись
 
-Принудительное завершение GUI может оставить дочерний core работающим: надёжный supervisor и восстановление native состояния остаются обязательными задачами helper/service. Исключения приложений вне Android отклоняются явно.
+**iOS:** unsigned Runner.app содержит два расширения, но не устанавливается на iPhone. Для проверки нужны Apple Team, provisioning, capabilities и физическое устройство. [Инструкция](IOS.md).
 
-## Оставшиеся протоколы
+**Windows:** запуск GUI вызывает UAC; установка драйвера/сервиса в CI не выполняется. Подпись publisher и установщик отсутствуют.
 
-iOS: добавлен отдельный AWGPacketTunnel target с официальным amneziawg-apple (pinned upstream 9d5ee60edefa95b933a738dd7cda671dd18021fc). Отдельный Go runtime, WgQuick parser с S/H/I, shared Keychain для ключей, только account ID в VPN preferences, сообщения расширению возвращают лишь счётчики. Native сборка и работа на устройстве ещё требуют проверки.
+**Linux:** VLESS core требует NET_ADMIN/NET_RAW либо административного запуска. Для AWG предусмотрен pkexec. AppImage/DEB и установка capabilities пока не реализованы.
 
-AmneziaWG на desktop **не реализован**. Vanilla sing-box WireGuard не является AWG. Desktop adapter явно отклоняет AWG; Авто может выбрать VLESS. Остаётся AWG backend/helper с управлением правами.
+**macOS:** AWG extension требует разрешённой Apple подписи и provisioning. Ad-hoc упаковка не даёт Network Extension права и не проходит Gatekeeper/notarization. Для VLESS process нужны повышенные права; App Sandbox host выключен, поэтому этот вариант не предназначен для Mac App Store. Подписанный helper/XPC и VLESS NE на macOS ещё не реализованы.
 
-## Проверки
+## Границы проверки
 
-Локально: 33 Flutter tests проходят, формат и analyzer проверяются; официальный sing-box 1.14.4 успешно выполнил `check` для desktop и iOS JSON fixtures. Команда check не запускает VPN и не меняет маршруты компьютера. Полные native сборки выполняются в GitHub Actions. Действующие VPN-серверы не трогаются.
+Обычное закрытие окна вызывает stop, но после аварийного завершения GUI tunnel/service может остаться работающим. Надёжный supervisor/reconciliation, автоматическое восстановление после сна и fail-closed kill switch не заявлены. AWG проверяется по HTTPS и росту counters: это не доказательство прохождения конкретного HTTPS-запроса через AWG при произвольных AllowedIPs. Домены .ru/.рф/.su — эвристика российских сайтов, не геобаза. Для AWG доменных исключений нет; ручные домены явно отклоняются.
 
-До релиза нужны: tests реального TUN на отдельном стенде, DNS/IPv6, рассыпание сети, reconnect/revoke, права и native supervisor, Apple signing/device validation, аудит iOS shared container protection и GPL corresponding sources. Старый релиз 0.1.0 не заменяется непроверенными сборками.
-
-Плагин sing_box vendored в packages/sing_box_ios с регистрацией только iOS: неиспользуемая Android часть создавала конфликт gomobile go.Seq с существующим Xray. iOS исходники сохранены, лицензия и notices включены.
+Плагин sing_box vendored только для iOS: неиспользуемая Android-регистрация конфликтовала по gomobile go.Seq с Xray. Подробности и corresponding sources: [лицензии](LICENSES.md), [исходники](SOURCES.md).

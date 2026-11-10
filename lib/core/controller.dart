@@ -131,7 +131,7 @@ class FoxController extends ChangeNotifier {
     final base = requireHttps(endpoint);
     final res = await ApiClient(base).request(
       '/v1/auth/exchange',
-      body: {'code': code, 'client': 'foxway', 'version': '0.1.0'},
+      body: {'code': code, 'client': 'foxway', 'version': '0.2.0'},
     );
     final access = res['access_token'];
     if (access is! String || access.isEmpty) {

@@ -143,3 +143,20 @@ jobs:
         with:
           name: iOS-unsigned-AWG-VLESS-experimental
           path: build/ios/iphoneos/Runner.app
+
+  sources:
+    needs: checks
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - uses: ./.github/actions/flutter
+      - run: flutter pub get --enforce-lockfile
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.26'
+          cache: false
+      - run: python3 scripts/bundle_sources.py
+      - uses: actions/upload-artifact@v4
+        with:
+          name: corresponding-source
+          path: build/FoxWay-corresponding-source.tar.gz
