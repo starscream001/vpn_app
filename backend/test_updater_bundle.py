@@ -27,6 +27,10 @@ class UpdaterArchiveTests(unittest.TestCase):
             for name in ('../escape','/etc/test','C:\\escape','dir\\escape'):
                 p,digest=self.archive(folder,name)
                 with self.assertRaises(ValueError):updater.validate(p,digest)
+    def test_normalized_alias_cannot_overwrite_verified_member(self):
+        with tempfile.TemporaryDirectory() as folder:
+            p,digest=self.archive(folder,'./foxway')
+            with self.assertRaises(ValueError):updater.validate(p,digest)
     def test_incomplete_bundle_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             p,digest=self.archive(folder,complete=False)

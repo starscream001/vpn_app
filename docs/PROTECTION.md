@@ -67,3 +67,5 @@ PF helper требует root и существующий системный anc
 ## Что реально проверено
 
 Unit/fake-channel тесты policy/удержания guard, safe render nft, Go cross-build Windows и compilation Apple targets проверяют код и сборку. **Ни WFP/nft/PF rules, ни kill core, ни системный lockdown не применялись к компьютеру пользователя.** Для готовности security feature нужен изолированный стенд: живые TCP/UDP до подключения, abrupt core/GUI death, оба IP families/DNS, reconnect/sleep, отказ permissions и конфликт/удаление собственного guard. Без этого не утверждается доказанная защита от утечек на устройствах.
+
+После аварии GUI старый process sing-box может продолжать работу. Снятие firewall само по себе не подтверждает остановку такого orphan core: persistent process registry/supervisor и полное native reconciliation остаются ограничениями preview. Новая instance управляет своим дочерним process; AWG Windows service имеет стабильное собственное имя. До массового выпуска нужны отдельные тесты этого сценария.

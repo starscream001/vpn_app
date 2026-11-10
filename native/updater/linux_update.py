@@ -20,9 +20,9 @@ def validate(archive, expected):
         names=set();size=0
         for e in z.infolist():
             p=Path(e.filename)
-            if p.is_absolute() or '..' in p.parts or '\\' in e.filename or ':' in e.filename or stat.S_ISLNK(e.external_attr>>16):raise ValueError('Unsafe archive entry')
-            if e.filename in names:raise ValueError('Duplicate entry')
-            names.add(e.filename);size+=e.file_size
+            if not p.parts or p.is_absolute() or '..' in p.parts or '\\' in e.filename or ':' in e.filename or stat.S_ISLNK(e.external_attr>>16):raise ValueError('Unsafe archive entry')
+            if p.as_posix() in names:raise ValueError('Duplicate entry')
+            names.add(p.as_posix());size+=e.file_size
             if len(names)>20000 or size>2*1024**3:raise ValueError('Archive too large')
         if not {'foxway','sing-box','amneziawg-go','awg','awg-quick','foxway-guard.py'}<=names:raise ValueError('Incomplete bundle')
     return True

@@ -35,14 +35,6 @@ android {
     }
 
     signingConfigs {
-        System.getenv("FOXWAY_PREVIEW_KEYSTORE_PATH")?.let { path ->
-            getByName("debug") {
-                storeFile = file(path)
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
-            }
-        }
         System.getenv("FOXWAY_RELEASE_KEYSTORE_PATH")?.let { path ->
             create("production") {
                 storeFile = file(path)

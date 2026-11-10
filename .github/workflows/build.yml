@@ -50,18 +50,6 @@ jobs:
           packages: platform-tools
           log-accepted-android-sdk-licenses: false
       - run: sdkmanager "cmake;3.22.1"
-      - uses: actions/cache@v4
-        if: github.ref == 'refs/heads/main'
-        with:
-          path: ${{ runner.temp }}/foxway-preview.jks
-          key: foxway-preview-signing-v1
-      - name: Prepare consistent preview signature (not production)
-        shell: bash
-        run: |
-          if [ ! -f "$RUNNER_TEMP/foxway-preview.jks" ]; then
-            keytool -genkeypair -keystore "$RUNNER_TEMP/foxway-preview.jks" -storepass android -keypass android -alias androiddebugkey -keyalg RSA -keysize 2048 -validity 10000 -dname "CN=FoxWay Preview,O=Development,C=ZZ"
-          fi
-          echo "FOXWAY_PREVIEW_KEYSTORE_PATH=$RUNNER_TEMP/foxway-preview.jks" >> "$GITHUB_ENV"
       - name: Configure production signing when repository secrets exist
         shell: bash
         env:
