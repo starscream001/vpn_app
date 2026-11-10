@@ -30,13 +30,16 @@ server = ThreadingHTTPServer(('127.0.0.1', 0), Fixture)
 thread = threading.Thread(target=server.serve_forever, daemon=True)
 thread.start()
 config = json.loads(Path(sys.argv[2]).read_text())
-proxy_port, api_port, closed_port = port(), port(), port()
-config['inbounds'] = [{'type':'http','tag':'route-fixture','listen':'127.0.0.1','listen_port':proxy_port}]
+proxy_port, quality_port, api_port, closed_port = port(), port(), port(), port()
+config['inbounds'] = [
+    {'type':'http','tag':'route-fixture','listen':'127.0.0.1','listen_port':proxy_port},
+    {'type':'http','tag':'quality','listen':'127.0.0.1','listen_port':quality_port},
+]
 config['outbounds'][0]['server'] = '127.0.0.1'
 config['outbounds'][0]['server_port'] = closed_port
 config['dns'] = {'servers':[{'type':'hosts','tag':'bootstrap','predefined':{
     'local.fixture.ru':['127.0.0.1'], 'local.fixture.com':['127.0.0.1']}}], 'final':'bootstrap'}
-config['experimental']['clash_api']['external_controller'] = f'127.0.0.1:{api_port}'
+config.setdefault('experimental', {}).setdefault('clash_api', {})['external_controller'] = f'127.0.0.1:{api_port}'
 core = subprocess.Popen([sys.argv[1], 'run', '-c', 'stdin'], stdin=subprocess.PIPE,
                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
 try:
@@ -49,8 +52,8 @@ try:
                 break
         except OSError:
             time.sleep(.1)
-    def fetch(domain):
-        connection = http.client.HTTPConnection('127.0.0.1', proxy_port, timeout=5)
+    def fetch(domain, listener=proxy_port):
+        connection = http.client.HTTPConnection('127.0.0.1', listener, timeout=5)
         try:
             connection.request('GET', f'http://{domain}:{server.server_port}/')
             response = connection.getresponse()
@@ -59,12 +62,13 @@ try:
             connection.close()
     status, body = fetch('local.fixture.ru')
     assert status == 200 and body == b'FOXWAY_LOCAL_DIRECT_FIXTURE', (status, body)
-    try:
-        status, body = fetch('local.fixture.com')
-        assert status != 200 and body != b'FOXWAY_LOCAL_DIRECT_FIXTURE'
-    except (http.client.RemoteDisconnected, ConnectionError):
-        pass
-    print('Native routing PASS: .ru direct; other domain cannot leak to direct when proxy fails')
+    for domain, listener in [('local.fixture.com', proxy_port), ('local.fixture.ru', quality_port)]:
+        try:
+            status, body = fetch(domain, listener)
+            assert status != 200 and body != b'FOXWAY_LOCAL_DIRECT_FIXTURE'
+        except (http.client.RemoteDisconnected, ConnectionError):
+            pass
+    print('Native routing PASS: .ru direct; other domains and forced quality probes cannot fall back to direct')
 finally:
     core.terminate()
     try:core.wait(timeout=5)

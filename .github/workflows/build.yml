@@ -25,6 +25,7 @@ jobs:
           build/native/sing-box check -c build/review/sing-desktop.json
           build/native/sing-box check -c build/review/sing-ios.json
           python3 scripts/native_route_smoke.py build/native/sing-box build/review/sing-desktop.json
+          python3 scripts/native_route_smoke.py build/native/sing-box build/review/sing-ios.json
       - run: python3 -m unittest discover -s backend -v
       - uses: actions/upload-artifact@v4
         if: always()
