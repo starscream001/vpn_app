@@ -8,6 +8,7 @@ name = 'AWGPacketTunnel'
 target = project.targets.find { |t| t.name == name } || project.new_target(:app_extension, name, :ios, '15.0')
 group = project.main_group.find_subpath(name, true)
 group.set_source_tree('<group>')
+group.path = name
 Dir.glob(File.join(ios, name, '*.swift')).each do |path|
   basename = File.basename(path)
   ref = group.files.find { |f| f.path == basename } || group.new_file(basename)

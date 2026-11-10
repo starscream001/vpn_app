@@ -167,6 +167,7 @@
 				2ED85794317F2154078DD443 /* String+ArrayConversion.swift */,
 			);
 			name = AWGPacketTunnel;
+			path = AWGPacketTunnel;
 			sourceTree = "<group>";
 		};
 		9740EEB11CF90186004384FC /* Flutter */ = {
