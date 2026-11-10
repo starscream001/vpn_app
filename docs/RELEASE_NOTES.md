@@ -1,15 +1,17 @@
-FoxWay VPN 0.2.0 preview: нативные адаптеры VLESS/Reality и AmneziaWG добавлены для iOS, Windows, Linux и macOS; Android сохранён. Утверждённый стиль рыжей лисы A и горного фона, Авто/VLESS/Amnezia, импорт сторонних профилей, защищённое хранилище и архитектура Telegram-подписок.
+FoxWay VPN 0.3 preview — обновления приложения, session kill switch и существующая Telegram-подписка.
 
-Проверено: 36 тестов Flutter + 5 API, native config validation и loopback routing tests, Android APK/AAB, iOS unsigned с двумя расширениями, Windows/Linux/macOS native bundles. Все 7 jobs run 42764187193 успешны; source commit 5bf8b7871fd7fee2a0851e138011f1c52cc3320a. Реальные VPN-подключения не выполнялись: тестового сервера и Apple-аккаунта пока нет.
+Что добавлено:
+- Новый README со скриншотами, матрицей платформ и пользовательскими инструкциями.
+- @Ilyavpnadmin_bot → прежняя HTTPS-ссылка → импорт в FoxWay. Автообновление списка раз в 15 минут, mixed feed/expiry/cache. Сам бот и VPN-серверы не изменялись.
+- Проверка GitHub Releases при запуске и раз в 6 часов, Semver, allowlist URL и SHA-256. Android installer сверяет signer; Windows/Linux — staged bundle replacement после подтверждения, предыдущая версия для отката. macOS пока загружает проверенный архив; iOS требует App Store/TestFlight.
+- Strict session protection: Android OS lockdown, Apple NE options/On Demand, persistent Windows WFP, Linux nft, macOS PF. Неудачная проверка не снимает desktop guard; исключения временно не применяются. На Apple строгий режим не меняет provider автоматически.
 
-Для современного Android: app-arm64-v8a-release.apk. APK/AAB используют тестовую подпись; постоянный production keystore ещё не настроен, обновления требуют одинаковой подписи.
+Проверено: 49 Flutter + 16 Python tests, native config/routing smoke, сборки Android/iOS/Windows/macOS/Linux, corresponding-source archive. Все 7 jobs run 42800991614 успешны. Бинарники собраны из ad803c7d9bc8df3a1904cc3cef8e3b45e2efcede; тег дополнительно включает только документацию и release workflow, совпадение приложения проверяется перед публикацией.
 
-Windows: распаковать весь архив, запуск запрашивает UAC. Linux: распаковать весь bundle; VLESS требует NET_ADMIN/NET_RAW/административного запуска, AWG использует pkexec и требует iproute2/resolvconf/iptables или nftables/polkit. macOS: оба core executable Intel/Apple Silicon включены, но для TUN/NE нужны права и подходящая Apple подпись; это не notarized consumer installer. iOS: unsigned Runner.app не является установочным IPA/TestFlight, нужна подпись приложения и обоих расширений.
+Для современного Android: app-arm64-v8a-release.apk. **Подпись пока тестовая**; постоянный ключ ещё не сохранён в GitHub Secrets. Старые preview APK могут иметь несовместимый signer, автоматической очистки данных нет. Для надёжных обновлений нужен один постоянный signing key и возрастающий build number.
 
-Сайты .ru/.рф/.su напрямую и ручные домены — только VLESS, эвристика российских сайтов. Исключения приложений — Android. Полноценный kill switch, crash supervisor и production установщики ещё не реализованы. Telegram API — контракт и reference backend, без подключения боевого бота. Отчёты о рабочих серверах отправляются по согласию после настройки API, без ключей/сайтов/списка приложений.
+**Это preview, не подтверждённый security release.** Реальный VPN и kill-core/GUI leak checks на устройствах не выполнялись; WFP/nft/PF не применялись к компьютеру пользователя. Для Apple нет account/provisioning: unsigned .app не является установочным IPA/TestFlight, macOS ad-hoc не заменяет Developer ID/notarization. Нужны права/зависимости для desktop; macOS PF требует стандартный layout и при активации закрывает существующие соединения. Boot-time protection, полный process supervisor, crash/power-loss recovery установщика и signed production updater ещё требуют доработки/стенда.
 
-Corresponding sources и notices входят в релиз; архив исходников около 1.13 GB. GPL-компоненты распространяются с соответствующими лицензиями. SHA256SUMS.txt относится ко всем файлам этого релиза. Действующие VPN-серверы не изменялись.
+Новый bearer API/quality collector не развёрнут. Действующая подписка бота работает через прежние ссылки и сама по себе не включает отправку отчётов.
 
-Точные проверки, инструкции и ограничения: https://github.com/starscream001/vpn_app/blob/main/docs/VALIDATION.md
-
-Тег релиза включает последующую документацию и workflow публикации; файлы приложения совпадают с проверенным source commit. Это автоматически проверяется перед публикацией.
+SHA256SUMS, исходники зависимостей/ядер (~1.13 GB) и notices входят в релиз. Все возможности, восстановление сети и ограничения: https://github.com/starscream001/vpn_app/blob/main/docs/VALIDATION.md
