@@ -1,0 +1,38 @@
+name: Publish verified preview
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+  actions: read
+concurrency:
+  group: foxway-preview-release
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: v0.1.0-preview.1
+      SOURCE_SHA: eded064f66e92e5731f3196fd17791577b790bc1
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verify source CI succeeded
+        run: |
+          gh api repos/${{ github.repository }}/actions/runs/42716650329 > run.json
+          python3 -c 'import json,os; r=json.load(open("run.json")); assert r["conclusion"] == "success" and r["head_sha"] == os.environ["SOURCE_SHA"]'
+      - uses: actions/download-artifact@v4
+        with:
+          github-token: ${{ github.token }}
+          run-id: 42716650329
+          path: release-input
+      - run: python3 scripts/package_release.py
+      - name: Publish prerelease
+        run: |
+          if gh release view "$VERSION" >/dev/null 2>&1; then
+            echo "Release already exists; refusing to replace published files"
+            exit 1
+          fi
+          gh release create "$VERSION" --target "$SOURCE_SHA" --prerelease --title "FoxWay VPN 0.1.0 — Android preview" --notes-file docs/RELEASE_NOTES.md release-output/*
