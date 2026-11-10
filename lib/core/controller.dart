@@ -15,10 +15,12 @@ class FoxController extends ChangeNotifier {
     required this.store,
     required this.engine,
     required this.probe,
+    this.subscriptionLoader = fetchSubscription,
   });
   final StateStore store;
   final TunnelEngine engine;
   final QualityProbe probe;
+  final Future<SubscriptionDownload> Function(String) subscriptionLoader;
   List<Profile> profiles = [];
   List<SubscriptionSource> subscriptions = [];
   DateTime? _lastSubscriptionAttempt;
@@ -111,6 +113,7 @@ class FoxController extends ChangeNotifier {
       subscriptions.removeWhere((s) => s.id == source.id);
       subscriptions.add(source);
     } else {
+      subscriptionNotice = null;
       profiles = mergeCatalog(
         profiles,
         parseProfiles(text),
@@ -122,7 +125,7 @@ class FoxController extends ChangeNotifier {
   }
 
   Future<void> _refreshSource(SubscriptionSource source) async {
-    final download = await fetchSubscription(source.url);
+    final download = await subscriptionLoader(source.url);
     // Expiry from the trusted subscription response updates even an unchanged URI.
     final ids = download.profiles.map((p) => p.id).toSet();
     final configs = download.profiles.map((p) => p.config).toSet();
@@ -161,9 +164,10 @@ class FoxController extends ChangeNotifier {
     );
     source.lastSuccess = DateTime.now();
     source.skipped = download.skipped;
+    source.expiresAt = download.expiresAt;
     subscriptionNotice = download.skipped > 0
         ? 'Импортировано ${download.profiles.length}; несовместимых профилей: ${download.skipped}'
-        : null;
+        : 'Подписка загружена • серверов: ${download.profiles.length}';
   }
 
   Future<void> refreshSubscriptions() async {

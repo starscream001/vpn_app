@@ -11,6 +11,7 @@ import 'package:file_selector/file_selector.dart';
 import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter/services.dart';
 import 'core/controller.dart';
+import 'core/api.dart' show importErrorMessage;
 import 'core/engine.dart';
 import 'core/native_engines.dart';
 import 'core/profile.dart';
@@ -523,7 +524,9 @@ class _FoxShellState extends State<FoxShell> {
           leading: const Icon(Icons.sync),
           title: Text(Uri.parse(source.url).host),
           subtitle: Text(
-            'Автообновление каждые 15 минут • несовместимых: ${source.skipped}',
+            'Серверов: ${c.profiles.where((p) => p.source == source.id).length}'
+            '${source.expiresAt == null ? '' : ' • до ${source.expiresAt!.toLocal().toString().split(' ').first}'}'
+            '\nАвтообновление каждые 15 минут • несовместимых: ${source.skipped}',
           ),
         ),
       ),
@@ -900,83 +903,112 @@ class _FoxShellState extends State<FoxShell> {
   Future<void> importDialog() async {
     final input = TextEditingController();
     String? error;
-    await showDialog<void>(
+    var importing = false;
+    final route = DialogRoute<void>(
       context: context,
+      barrierDismissible: false,
       builder: (context) => StatefulBuilder(
-        builder: (context, set) => AlertDialog(
-          title: const Text('Добавить подключение'),
-          content: SizedBox(
-            width: 480,
-            child: SingleChildScrollView(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  TextField(
-                    controller: input,
-                    minLines: 3,
-                    maxLines: 8,
-                    decoration: InputDecoration(
-                      labelText: 'VLESS, HTTPS-подписка или .conf',
-                      errorText: error,
+        builder: (context, set) => PopScope(
+          canPop: !importing,
+          child: AlertDialog(
+            title: Text(
+              importing ? 'Загружаем подписку…' : 'Добавить подключение',
+            ),
+            content: SizedBox(
+              width: 480,
+              child: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    TextField(
+                      controller: input,
+                      minLines: 3,
+                      maxLines: 8,
+                      decoration: InputDecoration(
+                        labelText: 'VLESS, HTTPS-подписка или .conf',
+                        errorMaxLines: 5,
+                        errorText: error,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 12),
-                  Wrap(
-                    spacing: 8,
-                    children: [
-                      TextButton.icon(
-                        onPressed: () async {
-                          final value = await Clipboard.getData(
-                            Clipboard.kTextPlain,
-                          );
-                          input.text = value?.text ?? '';
-                        },
-                        icon: const Icon(Icons.content_paste),
-                        label: const Text('Из буфера'),
-                      ),
-                      TextButton.icon(
-                        onPressed: () async {
-                          final file = await openFile();
-                          if (file != null) {
-                            if (await file.length() > 1024 * 1024) {
-                              set(() => error = 'Файл больше 1 МБ');
-                              return;
+                    const SizedBox(height: 12),
+                    Wrap(
+                      spacing: 8,
+                      children: [
+                        TextButton.icon(
+                          onPressed: () async {
+                            final value = await Clipboard.getData(
+                              Clipboard.kTextPlain,
+                            );
+                            input.text = value?.text ?? '';
+                          },
+                          icon: const Icon(Icons.content_paste),
+                          label: const Text('Из буфера'),
+                        ),
+                        TextButton.icon(
+                          onPressed: () async {
+                            final file = await openFile();
+                            if (file != null) {
+                              if (await file.length() > 1024 * 1024) {
+                                set(() => error = 'Файл больше 1 МБ');
+                                return;
+                              }
+                              input.text = await file.readAsString();
                             }
-                            input.text = await file.readAsString();
-                          }
-                        },
-                        icon: const Icon(Icons.folder_open),
-                        label: const Text('Из файла'),
-                      ),
-                    ],
-                  ),
-                ],
+                          },
+                          icon: const Icon(Icons.folder_open),
+                          label: const Text('Из файла'),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
+            actions: [
+              TextButton(
+                onPressed: importing ? null : () => Navigator.pop(context),
+                child: const Text('Отмена'),
+              ),
+              FilledButton(
+                onPressed: importing
+                    ? null
+                    : () async {
+                        set(() {
+                          importing = true;
+                          error = null;
+                        });
+                        try {
+                          final messenger = ScaffoldMessenger.of(context);
+                          await c.importText(input.text);
+                          if (context.mounted) {
+                            Navigator.pop(context);
+                            messenger.showSnackBar(
+                              SnackBar(
+                                content: Text(
+                                  c.subscriptionNotice ??
+                                      'Подключение добавлено',
+                                ),
+                              ),
+                            );
+                          }
+                        } catch (e) {
+                          if (context.mounted) {
+                            set(() {
+                              importing = false;
+                              error = importErrorMessage(e);
+                            });
+                          }
+                        }
+                      },
+                child: Text(importing ? 'Загрузка…' : 'Добавить'),
+              ),
+            ],
           ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Отмена'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                try {
-                  await c.importText(input.text);
-                  if (context.mounted) Navigator.pop(context);
-                } catch (_) {
-                  set(
-                    () => error =
-                        'Не удалось импортировать. Проверьте формат или HTTPS-адрес.',
-                  );
-                }
-              },
-              child: const Text('Добавить'),
-            ),
-          ],
         ),
       ),
     );
+    await Navigator.of(context).push(route);
+    await route.completed;
     input.dispose();
   }
 

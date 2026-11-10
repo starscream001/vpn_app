@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 
-const appVersion = '0.3.0-preview.1';
+const appVersion = '0.3.1-preview.1';
 const releaseRepository = 'starscream001/vpn_app';
 
 /// Semver comparison includes numeric prerelease precedence and ignores build metadata.

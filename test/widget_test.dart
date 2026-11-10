@@ -1,4 +1,7 @@
 import 'dart:io';
+import 'dart:async';
+import 'package:foxway/core/api.dart';
+import 'package:foxway/core/profile.dart' show configId;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
@@ -8,7 +11,7 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:foxway/main.dart';
 import 'package:foxway/core/controller.dart';
 import 'package:foxway/core/storage.dart';
-import 'core_test.dart' show MemoryVault, FakeEngine, FakeProbe;
+import 'core_test.dart' show MemoryVault, FakeEngine, FakeProbe, link;
 
 void main() {
   setUpAll(() async {
@@ -58,6 +61,82 @@ void main() {
       c.dispose();
     });
   }
+  testWidgets(
+    'Pasting a subscription shows loading, persists servers and confirms success',
+    (tester) async {
+      final pending = Completer<SubscriptionDownload>();
+      final c = FoxController(
+        store: StateStore(MemoryVault()),
+        engine: FakeEngine(),
+        probe: FakeProbe([]),
+        subscriptionLoader: (_) => pending.future,
+      );
+      await c.init();
+      await tester.pumpWidget(FoxWay(controller: c));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Подписка').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Добавить ссылку подписки'));
+      await tester.pumpAndSettle();
+      const url = 'https://subscription.example/s/test';
+      await tester.enterText(find.byType(TextField), url);
+      await tester.tap(find.text('Добавить'));
+      await tester.pump();
+      expect(find.text('Загружаем подписку…'), findsOneWidget);
+      final button = tester.widget<FilledButton>(
+        find.widgetWithText(FilledButton, 'Загрузка…'),
+      );
+      expect(button.onPressed, isNull);
+      pending.complete(decodeSubscription(link, configId(url)));
+      await tester.pumpAndSettle();
+      expect(find.byType(AlertDialog), findsNothing);
+      expect(find.text('subscription.example'), findsOneWidget);
+      expect(find.textContaining('Подписка загружена'), findsWidgets);
+      expect(c.profiles, hasLength(1));
+      expect(tester.takeException(), isNull);
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+      c.dispose();
+    },
+  );
+  testWidgets(
+    'Failed subscription stays editable and displays safe explanation',
+    (tester) async {
+      final c = FoxController(
+        store: StateStore(MemoryVault()),
+        engine: FakeEngine(),
+        probe: FakeProbe([]),
+        subscriptionLoader: (_) async =>
+            throw const SubscriptionImportException(
+              'Подписка не найдена. Получите новую ссылку у бота.',
+            ),
+      );
+      await c.init();
+      await tester.pumpWidget(FoxWay(controller: c));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Подписка').last);
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Добавить ссылку подписки'));
+      await tester.pumpAndSettle();
+      await tester.enterText(
+        find.byType(TextField),
+        'https://subscription.example/s/test',
+      );
+      await tester.tap(find.text('Добавить'));
+      await tester.pumpAndSettle();
+      expect(
+        find.text('Подписка не найдена. Получите новую ссылку у бота.'),
+        findsOneWidget,
+      );
+      expect(c.subscriptions, isEmpty);
+      expect(tester.takeException(), isNull);
+      await tester.tap(find.text('Отмена'));
+      await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+      c.dispose();
+    },
+  );
   testWidgets('large accessibility text does not overflow', (tester) async {
     tester.view.physicalSize = const Size(375, 812);
     tester.view.devicePixelRatio = 1;

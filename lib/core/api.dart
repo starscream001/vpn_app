@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'profile.dart';
@@ -71,7 +72,13 @@ SubscriptionDownload decodeSubscription(
   var text = input.trim();
   if (!text.startsWith('[Interface]') && !text.contains('://')) {
     try {
-      text = utf8.decode(base64.decode(base64.normalize(text))).trim();
+      text = utf8
+          .decode(
+            base64.decode(
+              base64.normalize(text.replaceAll(RegExp(r'\s+'), '')),
+            ),
+          )
+          .trim();
     } catch (_) {}
   }
   if (text.startsWith('[Interface]')) {
@@ -124,36 +131,114 @@ SubscriptionDownload decodeSubscription(
   );
 }
 
-Future<SubscriptionDownload> fetchSubscription(String url) async {
-  final uri = requireHttps(url);
-  final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
+/// Safe for display: never includes a subscription URL, token or response body.
+class SubscriptionImportException implements Exception {
+  const SubscriptionImportException(this.message);
+  final String message;
+  @override
+  String toString() => message;
+}
+
+String importErrorMessage(Object error) {
+  if (error is SubscriptionImportException) return error.message;
+  if (error is TimeoutException) {
+    return 'Сервер подписки не ответил вовремя. Попробуйте ещё раз.';
+  }
+  if (error is HandshakeException) {
+    return 'Не удалось проверить защищённое соединение с сервером подписки.';
+  }
+  if (error is SocketException || error is HttpException) {
+    return 'Сервер подписки недоступен. Проверьте интернет и повторите попытку.';
+  }
+  if (error is FormatException) {
+    return 'Нет совместимых профилей. Нужна HTTPS-подписка, VLESS TCP Reality/TLS или AmneziaWG .conf.';
+  }
+  return 'Не удалось сохранить подключение. Повторите попытку.';
+}
+
+Future<SubscriptionDownload> fetchSubscription(
+  String url, {
+  HttpClient? httpClient,
+}) async {
+  var uri = requireHttps(url);
+  final client =
+      httpClient ??
+      (HttpClient()..connectionTimeout = const Duration(seconds: 10));
   try {
-    final req = await client.getUrl(uri).timeout(const Duration(seconds: 15));
-    req.followRedirects = false;
-    req.headers.set('User-Agent', 'FoxWay/0.3.0');
-    final res = await req.close().timeout(const Duration(seconds: 15));
+    HttpClientResponse? response;
+    for (var redirects = 0; redirects <= 5; redirects++) {
+      final req = await client.getUrl(uri).timeout(const Duration(seconds: 15));
+      req.followRedirects = false;
+      req.headers.set('User-Agent', 'FoxWay/0.3.1');
+      req.headers.set(
+        HttpHeaders.acceptHeader,
+        'text/plain, application/octet-stream;q=0.9, */*;q=0.1',
+      );
+      final res = await req.close().timeout(const Duration(seconds: 15));
+      if ([301, 302, 303, 307, 308].contains(res.statusCode)) {
+        final location = res.headers.value(HttpHeaders.locationHeader);
+        if (location == null || redirects == 5) {
+          throw const SubscriptionImportException(
+            'Ссылка подписки содержит слишком много перенаправлений или повреждена.',
+          );
+        }
+        try {
+          uri = requireHttps(uri.resolve(location).toString());
+        } on FormatException {
+          throw const SubscriptionImportException(
+            'Сервер перенаправляет на небезопасный адрес. Нужна HTTPS-ссылка.',
+          );
+        }
+        continue;
+      }
+      response = res;
+      break;
+    }
+    final res = response!;
     if (res.statusCode != 200) {
-      throw HttpException('Подписка: HTTP ${res.statusCode}');
+      throw SubscriptionImportException(switch (res.statusCode) {
+        401 || 403 =>
+          'Доступ к подписке закрыт. Проверьте срок действия и получите актуальную ссылку у бота.',
+        404 || 410 =>
+          'Подписка не найдена или удалена. Скопируйте актуальную VPN-ссылку из бота.',
+        429 => 'Слишком много запросов. Подождите и попробуйте снова.',
+        _ =>
+          'Сервер подписки вернул ошибку HTTP ${res.statusCode}. Попробуйте позже.',
+      });
     }
     final expiry = RegExp(
       r'(?:^|;)\s*expire=(\d+)',
     ).firstMatch(res.headers.value('subscription-userinfo') ?? '');
-    final seconds = expiry == null ? 0 : int.parse(expiry[1]!);
-    final expiresAt = seconds > 0
+    final seconds = int.tryParse(expiry?[1] ?? '') ?? 0;
+    final expiresAt = seconds > 0 && seconds < 8640000000000
         ? DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true)
         : null;
     final bytes = <int>[];
     await for (final chunk in res.timeout(const Duration(seconds: 15))) {
       bytes.addAll(chunk);
       if (bytes.length > 1024 * 1024) {
-        throw const FormatException('Подписка больше 1 МБ');
+        throw const SubscriptionImportException(
+          'Подписка больше 1 МБ. Запросите ссылку для VPN-клиента.',
+        );
       }
     }
-    return decodeSubscription(
-      utf8.decode(bytes),
+    final text = utf8.decode(bytes).replaceFirst('\uFEFF', '').trim();
+    if (text.isEmpty) {
+      throw const SubscriptionImportException(
+        'Подписка пока пуста. Проверьте её в Telegram-боте.',
+      );
+    }
+    if (text.startsWith('<')) {
+      throw const SubscriptionImportException(
+        'По ссылке открывается веб-страница. В боте скопируйте VPN-ссылку для приложения.',
+      );
+    }
+    final download = decodeSubscription(
+      text,
       configId(url),
       expiresAt: expiresAt,
     );
+    return download;
   } finally {
     client.close(force: true);
   }
@@ -163,14 +248,20 @@ Future<List<Profile>> downloadSubscription(String url) async =>
     (await fetchSubscription(url)).profiles;
 
 class SubscriptionSource {
-  SubscriptionSource(this.url, {this.lastSuccess, this.skipped = 0});
+  SubscriptionSource(
+    this.url, {
+    this.lastSuccess,
+    this.expiresAt,
+    this.skipped = 0,
+  });
   final String url;
-  DateTime? lastSuccess;
+  DateTime? lastSuccess, expiresAt;
   int skipped;
   String get id => configId(url);
   Map<String, dynamic> toJson() => {
     'url': url,
     'lastSuccess': lastSuccess?.toIso8601String(),
+    'expiresAt': expiresAt?.toIso8601String(),
     'skipped': skipped,
   };
   factory SubscriptionSource.fromJson(Map<String, dynamic> j) =>
@@ -178,6 +269,7 @@ class SubscriptionSource {
         requireHttps(j['url'] as String).toString(),
         lastSuccess: DateTime.tryParse(j['lastSuccess'] as String? ?? ''),
         skipped: j['skipped'] as int? ?? 0,
+        expiresAt: DateTime.tryParse(j['expiresAt'] as String? ?? ''),
       );
 }
 
