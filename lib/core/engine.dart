@@ -28,12 +28,18 @@ class AndroidEngine implements TunnelEngine, ProxyProbeEngine {
   static const channel = MethodChannel('app.foxway/tunnel');
   Profile? _active;
   bool _initialized = false;
+  int _generation = 0;
   V2RayStatus _status = V2RayStatus();
   late final FlutterV2ray _xray = FlutterV2ray(
     onStatusChanged: (s) => _status = s,
   );
   @override
   Future<void> start(Profile profile, RoutingPolicy policy) async {
+    final generation = ++_generation;
+    void checkCancelled() {
+      if (generation != _generation) throw StateError('Подключение отменено');
+    }
+
     if (!Platform.isAndroid) {
       throw UnsupportedError(
         'VPN пока подключён только на Android. Эта платформа — предварительная сборка.',
@@ -49,7 +55,10 @@ class AndroidEngine implements TunnelEngine, ProxyProbeEngine {
         );
       }
     }
-    await stop();
+    checkCancelled();
+    await _stopNative();
+    checkCancelled();
+
     if (profile.protocol == Protocol.amnezia) {
       if (policy.domains.isNotEmpty) {
         throw UnsupportedError(
@@ -65,9 +74,11 @@ class AndroidEngine implements TunnelEngine, ProxyProbeEngine {
         await _xray.initializeV2Ray();
         _initialized = true;
       }
+      checkCancelled();
       if (!await _xray.requestPermission()) {
         throw StateError('Разрешение VPN не выдано');
       }
+      checkCancelled();
       _status = V2RayStatus();
       await _xray.startV2Ray(
         remark: 'FoxWay VPN',
@@ -77,6 +88,7 @@ class AndroidEngine implements TunnelEngine, ProxyProbeEngine {
       );
       final deadline = DateTime.now().add(const Duration(seconds: 15));
       while (_status.state != 'CONNECTED') {
+        checkCancelled();
         if (DateTime.now().isAfter(deadline)) {
           await _xray.stopV2Ray();
           throw TimeoutException('Туннель не запустился');
@@ -84,6 +96,7 @@ class AndroidEngine implements TunnelEngine, ProxyProbeEngine {
         await Future<void>.delayed(const Duration(milliseconds: 250));
       }
     }
+    checkCancelled();
     _active = profile;
   }
 
@@ -106,10 +119,17 @@ class AndroidEngine implements TunnelEngine, ProxyProbeEngine {
 
   @override
   Future<void> stop() async {
+    _generation++;
+    await _stopNative();
+  }
+
+  Future<void> _stopNative() async {
     if (!Platform.isAndroid) return;
     // Stop both: process recreation can lose the Dart-side active profile.
-    await channel.invokeMethod('stop');
-    if (_initialized) await _xray.stopV2Ray();
+    await Future.wait<void>([
+      channel.invokeMethod<void>('stop').timeout(const Duration(seconds: 12)),
+      _xray.stopV2Ray().timeout(const Duration(seconds: 12)),
+    ]);
     _active = null;
   }
 }

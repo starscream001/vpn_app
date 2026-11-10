@@ -8,7 +8,14 @@ import 'storage.dart';
 import 'updates.dart' show appVersion;
 import 'protection.dart';
 
-enum ConnectionState { disconnected, connecting, connected, checking, error }
+enum ConnectionState {
+  disconnected,
+  connecting,
+  connected,
+  checking,
+  stopping,
+  error,
+}
 
 class FoxController extends ChangeNotifier {
   FoxController({
@@ -41,6 +48,8 @@ class FoxController extends ChangeNotifier {
   bool _busy = false, _polling = false;
   late ReportQueue reports;
   Future<void> _writes = Future.value();
+  Completer<void>? _connectDone, _cancelConnection;
+  Future<void>? _disconnecting;
   Future<void> init() async {
     try {
       final j = await store.load();
@@ -308,9 +317,12 @@ class FoxController extends ChangeNotifier {
   }
 
   Future<void> connect({String? skipId}) async {
-    if (_busy || !ready) return;
+    if (_busy || _disconnecting != null || !ready) return;
     _busy = true;
-    _session++;
+    final session = ++_session;
+    final done = Completer<void>();
+    _connectDone = done;
+    _cancelConnection = Completer<void>();
     error = null;
     state = ConnectionState.connecting;
     notifyListeners();
@@ -324,14 +336,26 @@ class FoxController extends ChangeNotifier {
       if (routing.killSwitch && engine is ProtectionControl) {
         await (engine as ProtectionControl).prepareProtection(candidates);
       }
+      if (session != _session) return;
       if (candidates.isEmpty) throw StateError('Добавьте профиль или подписку');
       for (final p in candidates) {
         try {
           await engine.start(p, routing.enforced);
+          if (session != _session) {
+            await engine.stop();
+            return;
+          }
           state = ConnectionState.checking;
           notifyListeners();
-          final result = await probe.check(engine);
+          final result = await Future.any([
+            probe.check(engine),
+            _cancelConnection!.future.then(
+              (_) => const ProbeResult(false, 0, 0, 0, 'cancelled'),
+            ),
+          ]);
+          if (session != _session) return;
           await _record(p, result);
+          if (session != _session) return;
           if (result.ok) {
             error = null;
             active = p;
@@ -341,23 +365,28 @@ class FoxController extends ChangeNotifier {
             return;
           }
         } catch (e) {
+          if (session != _session) return;
           error = e is UnsupportedError
               ? e.message.toString()
               : 'Подключение не удалось';
           await _record(p, const ProbeResult(false, 0, 0, 0, 'start_failed'));
         }
         await engine.stop();
+        if (session != _session) return;
         if (mode != Protocol.auto || selectedId != null) break;
       }
       throw StateError(
         error ?? 'Нет ответа через VPN. Проверьте профиль и сеть.',
       );
     } catch (e) {
+      if (session != _session) return;
       error = e.toString().replaceFirst('Bad state: ', '');
       state = ConnectionState.error;
       await engine.stop();
     } finally {
       _busy = false;
+      done.complete();
+      if (identical(_connectDone, done)) _connectDone = null;
       notifyListeners();
     }
   }
@@ -383,20 +412,42 @@ class FoxController extends ChangeNotifier {
     }
   }
 
-  Future<void> disconnect({bool releaseProtection = true}) async {
-    if (_busy) return;
+  Future<void> disconnect({bool releaseProtection = true}) {
+    return _disconnecting ??= _performDisconnect(
+      releaseProtection,
+    ).whenComplete(() => _disconnecting = null);
+  }
+
+  Future<void> _performDisconnect(bool releaseProtection) async {
     _session++;
-    if (releaseProtection &&
-        routing.killSwitch &&
-        engine is ProtectionControl) {
-      await (engine as ProtectionControl).releaseProtection();
-    } else {
-      await engine.stop();
-    }
-    active = null;
-    traffic = const Traffic(0, 0, false);
-    state = ConnectionState.disconnected;
+    if (_cancelConnection?.isCompleted == false) _cancelConnection!.complete();
+    final pending = _connectDone?.future;
+    state = ConnectionState.stopping;
     notifyListeners();
+    try {
+      // Signal native cancellation immediately, then stop again after a pending
+      // native start finishes so it cannot resurrect the tunnel after the click.
+      await engine.stop();
+      if (pending != null) await pending;
+      if (releaseProtection &&
+          routing.killSwitch &&
+          engine is ProtectionControl) {
+        await (engine as ProtectionControl).releaseProtection();
+      } else {
+        await engine.stop();
+      }
+      active = null;
+      traffic = const Traffic(0, 0, false);
+      error = null;
+      state = ConnectionState.disconnected;
+    } catch (_) {
+      error =
+          'Не удалось подтвердить остановку VPN. Повторите отключение или откройте системные настройки VPN.';
+      state = ConnectionState.error;
+      rethrow;
+    } finally {
+      notifyListeners();
+    }
   }
 
   Future<void> poll() async {

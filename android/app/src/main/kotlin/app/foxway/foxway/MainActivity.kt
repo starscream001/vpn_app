@@ -116,12 +116,18 @@ class MainActivity : FlutterActivity() {
                             pending = action; permissionResult = result; startActivityForResult(permission, 104)
                         } else action()
                     }
-                    "stop" -> worker.execute {
-                        try {
-                            backend.setState(tunnel, Tunnel.State.DOWN, null)
-                            stopService(Intent(this, TunnelKeeper::class.java))
-                            runOnUiThread { result.success(null) }
-                        } catch (_: Exception) { runOnUiThread { result.error("VPN_STOP", "Could not stop tunnel", null) } }
+                    "stop" -> {
+                        // A late permission grant must not revive a cancelled start.
+                        pending = null
+                        permissionResult?.error("CANCELLED", "VPN start cancelled", null)
+                        permissionResult = null
+                        worker.execute {
+                            try {
+                                backend.setState(tunnel, Tunnel.State.DOWN, null)
+                                stopService(Intent(this, TunnelKeeper::class.java))
+                                runOnUiThread { result.success(null) }
+                            } catch (_: Exception) { runOnUiThread { result.error("VPN_STOP", "Could not stop tunnel", null) } }
+                        }
                     }
                     "stats" -> worker.execute {
                         try {

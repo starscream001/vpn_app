@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'dart:async';
 import 'package:foxway/core/api.dart';
+import 'package:foxway/core/engine.dart' show ProbeResult;
 import 'package:foxway/core/profile.dart' show configId;
 import 'dart:ui' as ui;
 import 'package:flutter/material.dart';
@@ -11,7 +12,8 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:foxway/main.dart';
 import 'package:foxway/core/controller.dart';
 import 'package:foxway/core/storage.dart';
-import 'core_test.dart' show MemoryVault, FakeEngine, FakeProbe, link;
+import 'core_test.dart'
+    show MemoryVault, FakeEngine, FakeProbe, link, DelayedProbe;
 
 void main() {
   setUpAll(() async {
@@ -132,6 +134,34 @@ void main() {
       expect(tester.takeException(), isNull);
       await tester.tap(find.text('Отмена'));
       await tester.pumpAndSettle();
+      await tester.pumpWidget(const SizedBox());
+      debugDefaultTargetPlatformOverride = null;
+      c.dispose();
+    },
+  );
+  testWidgets(
+    'Cancel button remains available during connection quality check',
+    (tester) async {
+      final probe = DelayedProbe();
+      final c = FoxController(
+        store: StateStore(MemoryVault()),
+        engine: FakeEngine(),
+        probe: probe,
+      );
+      await c.init();
+      await c.importText(link);
+      await tester.pumpWidget(FoxWay(controller: c));
+      await tester.pumpAndSettle();
+      final connecting = c.connect();
+      await tester.pump();
+      await tester.tap(find.widgetWithText(TextButton, 'Отменить подключение'));
+      await tester.pumpAndSettle();
+      await connecting;
+      expect(find.text('Не подключено'), findsOneWidget);
+      probe.result.complete(const ProbeResult(true, 1, 1, 1, 'https_204'));
+      await tester.pump();
+      expect(find.text('Подключено'), findsNothing);
+      expect(tester.takeException(), isNull);
       await tester.pumpWidget(const SizedBox());
       debugDefaultTargetPlatformOverride = null;
       c.dispose();

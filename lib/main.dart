@@ -283,6 +283,7 @@ class _FoxShellState extends State<FoxShell> {
       ConnectionState.connected => 'Подключено',
       ConnectionState.connecting => 'Подключаем…',
       ConnectionState.checking => 'Проверяем интернет…',
+      ConnectionState.stopping => 'Останавливаем…',
       ConnectionState.error => 'Не удалось подключиться',
       _ => 'Не подключено',
     };
@@ -290,7 +291,11 @@ class _FoxShellState extends State<FoxShell> {
       const SizedBox(height: 16),
       Center(
         child: Semantics(
-          label: connected ? 'Отключить VPN' : 'Подключить VPN',
+          label: busy
+              ? 'Отменить подключение'
+              : connected
+              ? 'Отключить VPN'
+              : 'Подключить VPN',
           button: true,
           child: Container(
             width: 172,
@@ -310,10 +315,14 @@ class _FoxShellState extends State<FoxShell> {
               ],
             ),
             child: IconButton(
-              tooltip: connected ? 'Отключить' : 'Подключить',
-              onPressed: busy
+              tooltip: busy
+                  ? 'Отменить подключение'
+                  : connected
+                  ? 'Отключить'
+                  : 'Подключить',
+              onPressed: c.state == ConnectionState.stopping
                   ? null
-                  : () => act(connected ? c.disconnect : c.connect),
+                  : () => act(connected || busy ? c.disconnect : c.connect),
               icon: busy
                   ? const SizedBox(
                       width: 48,
@@ -335,6 +344,14 @@ class _FoxShellState extends State<FoxShell> {
         textAlign: TextAlign.center,
         style: const TextStyle(fontSize: 24, fontWeight: FontWeight.w600),
       ),
+      if (busy)
+        Center(
+          child: TextButton.icon(
+            onPressed: () => act(c.disconnect),
+            icon: const Icon(Icons.close),
+            label: const Text('Отменить подключение'),
+          ),
+        ),
       const SizedBox(height: 8),
       Text(
         c.active?.name ?? 'Одна кнопка. Надёжное соединение.',
