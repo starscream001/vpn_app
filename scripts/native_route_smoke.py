@@ -19,6 +19,7 @@ def port():
 class Fixture(BaseHTTPRequestHandler):
     def do_GET(self):
         self.send_response(200)
+        self.send_header("Content-Length", str(len(b"FOXWAY_LOCAL_DIRECT_FIXTURE")))
         self.end_headers()
         self.wfile.write(b'FOXWAY_LOCAL_DIRECT_FIXTURE')
     def log_message(self, *_):
