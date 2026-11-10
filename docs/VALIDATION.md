@@ -1,56 +1,62 @@
-# Итоговые проверки — 10 ноября 2026
+# Проверки FoxWay 0.2.0 — 10 ноября 2026
 
-Проверенный commit: `eded064f66e92e5731f3196fd17791577b790bc1`. [Финальный GitHub Actions run](https://github.com/starscream001/vpn_app/actions/runs/42716650329) — **success**. Все шесть jobs завершены успешно; артефакты реально загружены.
+Проверенный source commit: `5bf8b7871fd7fee2a0851e138011f1c52cc3320a`.
+[GitHub Actions run 42764187193](https://github.com/starscream001/vpn_app/actions/runs/42764187193): **success**, все 7 jobs успешны, все 7 артефактов загружены. Документация и workflow публикации добавлены следующим коммитом; приложение и build workflow после проверенного SHA не менялись.
 
 | Проверка | Результат |
 |---|---|
-| Dart format / flutter analyze | PASS, без замечаний |
-| Flutter unit/widget tests | 30 PASS |
-| Backend unit tests | 5 PASS |
-| Android | debug APK, universal release APK, три ABI APK и AAB — PASS |
-| Windows x64 | release bundle — PASS |
-| Linux x64 | release bundle — PASS |
-| macOS | release app bundle — PASS |
-| iOS | release --no-codesign Runner.app — PASS |
+| Dart format / Flutter analyze | PASS, без замечаний |
+| Flutter unit/widget tests | 36 PASS |
+| Backend tests | 5 PASS |
+| Официальный sing-box 1.14.4 `check` | PASS для iOS и desktop JSON |
+| Native loopback routing smoke | PASS для обеих конфигураций: .ru direct; другой домен и принудительная quality-проба не переходят в direct при отказе прокси |
+| Android | Debug APK, universal release APK, 3 ABI APK, AAB — PASS |
+| iOS | AWG Go bridge + два Packet Tunnel расширения + unsigned Runner.app — PASS |
+| Windows x64 | Flutter release, AWG service/controller Go build, Wintun и sing-box packaging — PASS |
+| Linux x64 | Flutter release, AWG Go CLI + C tools и sing-box packaging — PASS |
+| macOS | AWG Go bridge arm64/x86_64, Flutter release с AWG extension, sing-box для обеих архитектур — PASS |
+| Corresponding sources | PASS, архив приложения/ядер/Go-зависимостей/Dart-плагинов, около 1.13 GB |
 
-## Артефакты финального прогона
+## Артефакты проверенного прогона
 
-- [Android APK/AAB, тестовая подпись](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13718757836)
-- [Windows UI preview](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13719675087)
-- [Linux UI preview](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13719390345)
-- [macOS UI preview](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13719630443)
-- [iOS unsigned UI preview](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13719315917)
-- [Coverage и снимок интерфейса](https://github.com/starscream001/vpn_app/actions/runs/42716650329/artifacts/13717579703)
+- [Android APK/AAB](https://github.com/starscream001/vpn_app/actions/runs/42764187193/artifacts/13739178396)
+- [iOS unsigned](https://github.com/starscream001/vpn_app/actions/runs/42764187193/artifacts/13738623532)
+- [Windows x64](https://github.com/starscream001/vpn_app/actions/runs/42764187193/artifacts/13739182367)
+- [Linux x64](https://github.com/starscream001/vpn_app/actions/runs/42764187193/artifacts/13739187080)
+- [macOS](https://github.com/starscream001/vpn_app/actions/runs/42764187193/artifacts/13738518794)
+- [Corresponding sources](https://github.com/starscream001/vpn_app/actions/runs/42764187193/artifacts/13739660441)
+- [Coverage и снимок UI](https://github.com/starscream001/vpn_app/actions/runs/42764187193/artifacts/13739201900)
 
-Артефакты Actions истекают 7 февраля 2027 по данным GitHub; скачивание может требовать входа. Android arm64 APK около 70.9 MB, armeabi-v7a 66.7 MB, x86_64 75.2 MB, universal 191.8 MB, AAB 120.7 MB (Flutter output). Подписи тестовые. Для будущих обновлений из магазина обязателен постоянный release keystore.
+Actions-артефакты имеют ограниченный срок хранения. Публичные файлы и SHA256SUMS публикуются отдельно в [Releases](https://github.com/starscream001/vpn_app/releases). Apple bundles заранее упакованы через ditto на Apple runner: транспорт артефактов не уничтожает symlinks/execute permissions. Release packager сохраняет эти архивы и добавляет notices; локальный smoke подтвердил execute bits нативных файлов, notices, обязательность source artifact и генерацию SHA256SUMS.
 
-## Локальные проверки
+## Локально выполнено
 
-Flutter 3.47.9 / Dart 3.13.7, Java 21, Android SDK 36, NDK 28.2.13676358, CMake 3.22.1. Те же 30 Flutter и 5 backend tests прошли локально, анализатор без замечаний. Android debug/release, три ABI APK и AAB также собраны локально.
+- Flutter 3.47.9 / Dart 3.13.7: analyze без замечаний, 36 Flutter и 5 Python backend tests PASS.
+- Официальный macOS sing-box 1.14.4: обе JSON-конфигурации check PASS; loopback routing smoke для обеих PASS. TUN не запускался, системные маршруты не менялись.
+- Windows AWG helper: Go 1.26 cross-build Windows/amd64 PASS, без установки/запуска service.
+- AWG Go CLI: cross-build Linux/amd64 PASS. AWG C tools: локальная компиляция PASS. Bash syntax check PASS.
+- Source exporter: PASS, 598 native dependency modules, опубликованные core sources и Dart plugin sources; Go 1.27 использован для AndroidLibXrayLite dependency graph. Локальный archive был пробным; release получает архив точного CI source commit.
+- Полный Xcode локально отсутствует, поэтому iOS/macOS native сборки подтверждены GitHub runners; Windows/Linux Flutter сборки также выполнялись на соответствующих runners.
 
-Отдельный HTTP smoke на временном loopback стенде подтвердил: обмен одноразового кода → авторизованный каталог → сохранение отчёта в SQLite. Использовались фикстуры, не настоящий Telegram и не действующие VPN-серверы.
+Тесты проверяют импорт VLESS/AWG2, S/H/I без потерь, запрет hooks/insecure TLS, выбор/отзыв/истечение профиля, partial refresh, tombstone после перезапуска, очереди и приватность отчётов, disconnect во время проверки; Apple AWG MethodChannel и счётчики; native конфиги и routing; интерфейс на телефоне/планшете/desktop, 200% текст и reduced motion. Fake-channel tests не заменяют iPhone.
 
-Widget tests: 390×844, 844×390, 1100×800, текст 200% и reduced motion. Снимок главной страницы просмотрен визуально. Проверяются импорт, AWG 2 поля, Reality, запрет hooks/insecure TLS, partial refresh, expiry/revocation, сохранение tombstone после перезапуска, неверный каталог, очередь и приватность отчётов, ручной disconnect во время quality probe.
+## Исправленные ошибки интеграции
 
-## Исправленные проблемы сборки
+- Отключена неиспользуемая Android-регистрация sing_box, вызывавшая duplicate gomobile go.Seq с Xray.
+- AWG Go вынесен в отдельный Apple extension, исправлены source groups и library search paths Xcode.
+- Сохранена первая default Keychain group существующего vault; VLESS/AWG native config exchange переведён в shared Keychain. Native plaintext config.json больше не записывается.
+- Windows linker больше не добавляет конфликтующий asInvoker manifest к requireAdministrator.
+- Фикстура HTTP возвращает Content-Length, чтобы тест маршрутизации не зависел от поведения TCP close на разных ОС.
+- macOS bundle включает оба sing-box executable, выбор по Dart ABI; Apple архивы сохраняют структуру bundles.
 
-1. Hiddify исключён из основы из-за опубликованных NonCommercial/дополнительных условий; использованы независимые библиотеки.
-2. Shallow checkout Flutter в CI без semver tag определял SDK как 0.0.0-unknown. У фиксированного upstream commit восстановлены соответствующий tag 3.47.9 и stable branch. Проверка lockfile сохранена.
-3. macOS 14 runners удалены GitHub 2 ноября 2026; использован macOS 15.
-4. Явно настроены Android SDK и CMake. Setup action больше не пытается установить удалённый Google пакет `tools`.
-5. Устранён конфликт META-INF OSGI manifest в Java dependency packaging.
-6. Локальный apkanalyzer требовал физически корректный SDK layout и Java 21. AAB stripping check пройден без отключения проверок.
+## Не проверено и не заявляется готовым
 
-CI runs до финального результата сохраняют историю ошибок; итоговый run выше зелёный. Документационный коммит после него помечен skip ci: исходный код приложения и workflow после проверенного SHA не меняются.
+По согласованию с пользователем нет отдельного тестового VPN-сервера и Apple Developer account. **Реальные подключения, установка на устройства и изменение VPN-маршрутов не выполнялись.** Успешная сборка не доказывает совместимость с выдаваемыми профилями. Нужен изолированный стенд AWG2/VLESS Reality: DNS/IPv6, split routing, Wi-Fi/LTE, сон/фон, отзыв/expiry и обновление с той же подписью.
 
-## Непроверенное и отсутствующее
+Apple unsigned не устанавливается как IPA/TestFlight и не получает Network Extension entitlement. macOS ad-hoc не заменяет Developer ID/provisioning/notarization. Windows просит UAC; Linux нужны права/зависимости из [NATIVE_VPN](NATIVE_VPN.md). Установщиков, signed broker/XPC, crash supervisor/reconciliation и полноценного fail-closed kill switch нет.
 
-Реальное VPN-подключение не выполнялось: отдельное тестовое устройство и тестовый endpoint не предоставлены. Наличие настоящих адаптеров, успешная компиляция и fake-engine tests не доказывают совместимость с выдаваемыми вами профилями. Нужен Android-стенд AWG 2.0/VLESS Reality, DNS/IPv6 leak checks, split routing, Wi-Fi/LTE, sleep/background, процесс/revoke/expiry и обновление с той же подписью.
+Доменные исключения .ru/.рф/.su и ручные домены реализованы для VLESS; это эвристика, не список всех российских сайтов. Для AWG доменных исключений нет; app-исключения есть только на Android. При произвольных AWG AllowedIPs HTTPS + counters не доказывают привязку конкретной пробы к туннелю.
 
-iOS/desktop — **интерфейс, импорт и хранилище без системного VPN**; на этих платформах кнопка VPN отключена. Network Extension и desktop privileged helpers ещё предстоит реализовать. iOS unsigned не является установочным IPA/TestFlight.
+Android APK/AAB подписаны тестовым ключом. Постоянный production keystore не настроен: обновление требует той же подписи; новая подпись может потребовать переустановки и не гарантирует сохранение vault. Боевые API Telegram/платежи/quality collector не развёрнуты: реализованы контракт и reference backend. Отчёты отправляются только после согласия и настройки API. Не реализованы QR/vpn://, EN/светлая тема. Юридический/SBOM аудит всех транзитивных объектов и 16 KB pages остаются перед коммерческим распространением.
 
-Российские домены напрямую реализованы только для VLESS (.ru/.рф/.su + ручные домены); AWG IP/DNS route manager отсутствует. ECH/CDN и российские сайты на других доменах требуют отдельных правил и тестов.
-
-Настоящий API бота и quality collector не развёрнуты; контракт и reference backend готовы. Не реализованы QR/vpn://, полноценный native always-on/kill switch, native state reconciliation после перезапуска, фоновые проверки во сне, светлая тема и EN. Перед коммерческим распространением нужен полный binary license/SBOM аудит, production signing и проверка 16 KB native pages.
-
-Действующие VPN-серверы и подключения компьютера не изменялись. Реальные платежи, публикация в магазинах и доступ к Telegram bot token не выполнялись.
+Действующие VPN-серверы и подключения компьютера не изменялись. Старый [0.1.0 preview](https://github.com/starscream001/vpn_app/releases/tag/v0.1.0-preview.1) сохранён.

@@ -1,11 +1,13 @@
-FoxWay VPN: первая предварительная версия с рыжей лисой A и горным фоном.
+FoxWay VPN 0.2.0 preview: нативные адаптеры VLESS/Reality и AmneziaWG добавлены для iOS, Windows, Linux и macOS; Android сохранён. Утверждённый стиль рыжей лисы A и горного фона, Авто/VLESS/Amnezia, импорт сторонних профилей, защищённое хранилище и архитектура Telegram-подписок.
 
-Android: адаптеры AmneziaWG и VLESS/Reality, импорт, исключения, Авто, защищённое хранилище и архитектура Telegram API. Реальное VPN-соединение на устройстве ещё не проверено. APK/AAB подписаны тестовым ключом; постоянный production signing ещё не настроен.
+Проверено: 36 тестов Flutter + 5 API, native config validation и loopback routing tests, Android APK/AAB, iOS unsigned с двумя расширениями, Windows/Linux/macOS native bundles. Все 7 jobs run 42764187193 успешны; source commit 5bf8b7871fd7fee2a0851e138011f1c52cc3320a. Реальные VPN-подключения не выполнялись: тестового сервера и Apple-аккаунта пока нет.
 
-Windows, Linux, macOS: пока интерфейс, импорт и хранилище БЕЗ VPN-туннеля. iOS: unsigned Runner.app, также БЕЗ VPN-туннеля; это не установочный IPA и не TestFlight.
+Для современного Android: app-arm64-v8a-release.apk. APK/AAB используют тестовую подпись; постоянный production keystore ещё не настроен, обновления требуют одинаковой подписи.
 
-Все пять платформ действительно собраны в GitHub Actions, 35 тестов прошли. Артефакты взяты из успешного run 42716650329, commit eded064f66e92e5731f3196fd17791577b790bc1. SHA256SUMS.txt относится к файлам этого релиза.
+Windows: распаковать весь архив, запуск запрашивает UAC. Linux: распаковать весь bundle; VLESS требует NET_ADMIN/NET_RAW/административного запуска, AWG использует pkexec и требует iproute2/resolvconf/iptables или nftables/polkit. macOS: оба core executable Intel/Apple Silicon включены, но для TUN/NE нужны права и подходящая Apple подпись; это не notarized consumer installer. iOS: unsigned Runner.app не является установочным IPA/TestFlight, нужна подпись приложения и обоих расширений.
 
-Для большинства современных Android-телефонов: app-arm64-v8a-release.apk. Остальные APK: armeabi-v7a, x86_64 и universal. Для iOS и desktop системные туннели разрабатываются следующим этапом.
+Сайты .ru/.рф/.su напрямую и ручные домены — только VLESS, эвристика российских сайтов. Исключения приложений — Android. Полноценный kill switch, crash supervisor и production установщики ещё не реализованы. Telegram API — контракт и reference backend, без подключения боевого бота. Отчёты о рабочих серверах отправляются по согласию после настройки API, без ключей/сайтов/списка приложений.
 
-Действующие VPN-серверы не изменялись. Документация: https://github.com/starscream001/vpn_app/blob/main/docs/VALIDATION.md
+Corresponding sources и notices входят в релиз; архив исходников около 1.13 GB. GPL-компоненты распространяются с соответствующими лицензиями. SHA256SUMS.txt относится ко всем файлам этого релиза. Действующие VPN-серверы не изменялись.
+
+Точные проверки, инструкции и ограничения: https://github.com/starscream001/vpn_app/blob/main/docs/VALIDATION.md

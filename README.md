@@ -42,7 +42,7 @@ GitHub Actions сохраняет Android APK/AAB с тестовой подпи
 
 ## Проверенные сборки
 
-[GitHub Actions: все jobs успешны](https://github.com/starscream001/vpn_app/actions/runs/42716650329). 30 Flutter tests + 5 backend tests, Android APK/AAB, Windows/Linux/macOS release bundles и iOS unsigned. Это подтверждение сборки; границы VPN-поддержки указаны выше. [Точные результаты и артефакты](docs/VALIDATION.md).
+[GitHub Actions 0.2: все 7 jobs успешны](https://github.com/starscream001/vpn_app/actions/runs/42764187193). 36 Flutter + 5 backend tests, native routing checks, Android APK/AAB, iOS unsigned и Windows/Linux/macOS native bundles. [Точные результаты](docs/VALIDATION.md). [Скачать preview](https://github.com/starscream001/vpn_app/releases). Реальные VPN-подключения ещё не проверены.
 
 ## Документация
 
