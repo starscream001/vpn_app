@@ -1,0 +1,1 @@
+Upstream https://github.com/amnezia-vpn/amneziawg-tools/tree/ee0f0a9aa34ff0a0da4b3433b9512781cfe02843 (GPL-2.0). Full tools src retained except build-output symlink wg-quick/awg -> ../wg. Linux quick is restricted to up/down, own fw+hash interface names, stdin-only profiles. Executable hooks and SaveConfig forbidden. Commands are separate executables, not linked into GPL-3 UI.

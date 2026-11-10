@@ -60,3 +60,7 @@ __pycache__/
 # Native bridge build products
 native/amnezia-apple/Sources/WireGuardKitGo/out/
 native/amnezia-apple/Sources/WireGuardKitGo/.tmp/
+
+/native/amnezia-tools/src/**/*.o
+/native/amnezia-tools/src/*.o
+/native/amnezia-tools/src/wg

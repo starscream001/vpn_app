@@ -1,0 +1,3 @@
+// Compile native extensions without an Apple Developer account.
+CODE_SIGNING_ALLOWED = NO
+CODE_SIGNING_REQUIRED = NO

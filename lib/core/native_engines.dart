@@ -9,6 +9,7 @@ import 'engine.dart';
 import 'profile.dart';
 import 'routing.dart';
 import 'sing_config.dart';
+import 'desktop_awg.dart';
 
 TunnelEngine platformEngine() => Platform.isAndroid
     ? AndroidEngine()
@@ -117,7 +118,7 @@ class AppleTunnelEngine implements TunnelEngine {
 }
 
 /// Owns one native TUN process. Secrets travel through stdin, never command arguments/files.
-class DesktopTunnelEngine implements TunnelEngine, ProxyProbeEngine {
+class DesktopVlessEngine implements TunnelEngine, ProxyProbeEngine {
   Process? _process;
   int _apiPort = 0, _probePort = 0;
   String _secret = '';
@@ -241,4 +242,32 @@ class DesktopTunnelEngine implements TunnelEngine, ProxyProbeEngine {
       await p.exitCode;
     }
   }
+}
+
+class DesktopTunnelEngine implements TunnelEngine, ProxyProbeEngine {
+  final _vless = DesktopVlessEngine();
+  late final TunnelEngine _awg = Platform.isWindows
+      ? WindowsAwgEngine()
+      : Platform.isMacOS
+      ? AppleAwgOnlyEngine()
+      : LinuxAwgEngine();
+  TunnelEngine? _active;
+  @override
+  String? get httpProxy => identical(_active, _vless) ? _vless.httpProxy : null;
+  @override
+  Future<void> start(Profile p, RoutingPolicy policy) async {
+    await stop();
+    _active = p.protocol == Protocol.amnezia ? _awg : _vless;
+    await _active!.start(p, policy);
+  }
+
+  @override
+  Future<void> stop() async {
+    await Future.wait([_vless.stop(), _awg.stop()]);
+    _active = null;
+  }
+
+  @override
+  Future<Traffic> traffic() async =>
+      _active == null ? const Traffic(0, 0, false) : await _active!.traffic();
 }

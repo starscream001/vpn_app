@@ -1,11 +1,13 @@
 require 'xcodeproj'
 require 'fileutils'
 root = File.expand_path('..', __dir__)
-ios = File.join(root, 'ios')
+platform = ARGV[0] || 'ios'
+abort 'unsupported platform' unless %w[ios macos].include?(platform)
+ios = File.join(root, platform)
 project = Xcodeproj::Project.open(File.join(ios, 'Runner.xcodeproj'))
 runner = project.targets.find { |t| t.name == 'Runner' }
 name = 'AWGPacketTunnel'
-target = project.targets.find { |t| t.name == name } || project.new_target(:app_extension, name, :ios, '15.0')
+target = project.targets.find { |t| t.name == name } || project.new_target(:app_extension, name, platform == 'macos' ? :osx : :ios, platform == 'macos' ? '12.0' : '15.0')
 group = project.main_group.find_subpath(name, true)
 group.set_source_tree('<group>')
 group.path = name
@@ -34,6 +36,7 @@ target.build_configurations.each do |config|
   config.build_settings.merge!({
     'PRODUCT_BUNDLE_IDENTIFIER' => 'app.foxway.foxway.AWGPacketTunnel',
     'PRODUCT_NAME' => name, 'SWIFT_VERSION' => '5.0', 'IPHONEOS_DEPLOYMENT_TARGET' => '15.0',
+    'MACOSX_DEPLOYMENT_TARGET' => '12.0',
     'APPLICATION_EXTENSION_API_ONLY' => 'YES', 'SKIP_INSTALL' => 'YES',
     'CODE_SIGN_ENTITLEMENTS' => "#{name}/#{name}.entitlements", 'INFOPLIST_FILE' => "#{name}/Info.plist",
     'LIBRARY_SEARCH_PATHS' => ['$(inherited)', '$(SRCROOT)/../native/amnezia-apple/Sources/WireGuardKitGo/out'],
@@ -56,12 +59,18 @@ host_group = project.main_group.find_subpath('Runner', false)
 ref = host_group.files.find { |f| f.path == 'AwgControl.swift' } || host_group.new_file('AwgControl.swift')
 runner.source_build_phase.add_file_reference(ref, true)
 keychain = '$(AppIdentifierPrefix)app.foxway.shared'
-['Runner/Runner.entitlements', "#{name}/#{name}.entitlements"].each do |relative|
+host_entitlements = platform == 'macos' ? ['Runner/DebugProfile.entitlements', 'Runner/Release.entitlements'] : ['Runner/Runner.entitlements']
+(host_entitlements + ["#{name}/#{name}.entitlements"]).each do |relative|
   path = File.join(ios, relative)
   data = File.exist?(path) ? Xcodeproj::Plist.read_from_path(path) : {}
   data['com.apple.developer.networking.networkextension'] = ['packet-tunnel-provider']
   data['com.apple.security.application-groups'] = ['group.app.foxway.foxway']
-  data['keychain-access-groups'] = [keychain]
+  data['keychain-access-groups'] = (['$(AppIdentifierPrefix)$(CFBundleIdentifier)'] + (data['keychain-access-groups'] || []) + [keychain]).uniq
+  if platform == 'macos' && relative.start_with?(name)
+    data['com.apple.security.app-sandbox'] = true
+    data['com.apple.security.network.client'] = true
+    data['com.apple.security.network.server'] = true
+  end
   Xcodeproj::Plist.write_to_path(data, path)
 end
 runner_info = File.join(ios, 'Runner/Info.plist')

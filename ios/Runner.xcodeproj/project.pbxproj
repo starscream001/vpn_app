@@ -870,6 +870,7 @@
 					"$(inherited)",
 					"$(SRCROOT)/../native/amnezia-apple/Sources/WireGuardKitGo/out",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MARKETING_VERSION = 0.2.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
@@ -898,6 +899,7 @@
 					"$(inherited)",
 					"$(SRCROOT)/../native/amnezia-apple/Sources/WireGuardKitGo/out",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MARKETING_VERSION = 0.2.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",
@@ -954,6 +956,7 @@
 					"$(inherited)",
 					"$(SRCROOT)/../native/amnezia-apple/Sources/WireGuardKitGo/out",
 				);
+				MACOSX_DEPLOYMENT_TARGET = 12.0;
 				MARKETING_VERSION = 0.2.0;
 				OTHER_LDFLAGS = (
 					"$(inherited)",

@@ -16,7 +16,7 @@ for platform in ('windows', 'linux', 'macos', 'iOS'):
         raise RuntimeError(f'Expected exactly one {platform} artifact')
     source = directories[0]
     for file in source.rglob('*'):
-        if file.is_file() and (file.name == 'foxway' or file.parent.name == 'MacOS' or file.suffix in ('.so', '.dylib')):
+        if file.is_file() and (file.name in ('foxway', 'sing-box', 'awg', 'awg-quick', 'amneziawg-go') or file.parent.name == 'MacOS' or file.suffix in ('.so', '.dylib')):
             file.chmod(0o755)
     with zipfile.ZipFile(out / f'FoxWay-{source.name}.zip', 'w', zipfile.ZIP_DEFLATED) as archive:
         for file in source.rglob('*'):
