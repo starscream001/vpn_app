@@ -54,13 +54,13 @@ VLESS использует `route.default_mark`, AWG получает собст
 
 ## macOS VLESS
 
-PF helper требует root и существующий системный anchor `com.apple/*`; приложение не перезаписывает главный pf.conf. Правила загружаются в `com.apple/foxway`, разрешают loopback, `utun88`, точный IP:port endpoint и необходимый control traffic. Разрешающие states для TUN/endpoint привязаны к интерфейсу (`if-bound`).
+PF helper требует root, стандартный единственный filter entry point `com.apple/*` и свой первый child anchor; layout с конкурирующим более ранним anchor или другими main filter rules отклоняется. Это ограничивает совместимость с кастомным PF, зато не выдаёт bypass за работающую защиту; приложение не перезаписывает главный pf.conf. Правила загружаются в `com.apple/000.foxway`, разрешают loopback, `utun88`, точный IP:port endpoint и необходимый control traffic. Разрешающие states для TUN/endpoint привязаны к интерфейсу (`if-bound`).
 
 При активации очищается **таблица текущих соединений PF**: иначе старый floating state способен обойти новые правила. Это закрывает существующие сетевые соединения; действие описано в подтверждении строгого режима. Основные и сторонние firewall rules не удаляются. Действующие сессии других приложений/другого VPN тоже могут прерваться: этот режим рассчитан на один VPN на клиенте.
 
 `pfctl -E` выдаёт собственный reference token, сохраняемый root в `/var/run/foxway-pf.token`. При явном снятии очищается только свой anchor и освобождается собственный token, без общего `pfctl -d`. Система не поддерживается молча, если anchor/права отсутствуют. Это standalone TUN/PF preview, не sandboxed Mac App Store продукт и не signed XPC broker.
 
-**Аварийное восстановление:** открыть FoxWay с теми же необходимыми правами и снять защиту. Ручная администрация должна очистить только `com.apple/foxway` и освободить конкретный собственный token; не заменять главный ruleset и не выключать чужие PF references. После reboot PF-защита сессии не обещается.
+**Аварийное восстановление:** открыть FoxWay с теми же необходимыми правами и снять защиту. Ручная администрация должна очистить только `com.apple/000.foxway` и освободить конкретный собственный token; не заменять главный ruleset и не выключать чужие PF references. После reboot PF-защита сессии не обещается.
 
 Обоснование `if-bound`/floating states: [OpenBSD PF options](https://www.openbsd.org/faq/pf/options.html), [pfctl states](https://man.openbsd.org/pfctl). Совместимость конкретной версии macOS PF всё равно требуется проверить на отдельной машине.
 

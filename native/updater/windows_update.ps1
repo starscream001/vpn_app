@@ -17,7 +17,7 @@ try {
       $size+=$entry.Length
       if (!$path.StartsWith($prefix,[StringComparison]::OrdinalIgnoreCase) -or $entry.FullName.Contains(':') -or (($entry.ExternalAttributes -shr 16) -band 0xF000) -eq 0xA000 -or !$names.Add($path) -or $names.Count -gt 20000 -or $size -gt 2GB) { throw 'Unsafe archive' }
     }
-    foreach ($required in @('foxway.exe','sing-box.exe','foxway-awg.exe','wintun.dll')) { if (!$names.Contains((Join-Path $stage $required))) { throw 'Incomplete bundle' } }
+    foreach ($required in @('foxway.exe','sing-box.exe','foxway-awg.exe','wintun.dll','foxway-update.ps1')) { if (!$names.Contains((Join-Path $stage $required))) { throw 'Incomplete bundle' } }
     foreach ($entry in $zip.Entries) {
       $path=[IO.Path]::GetFullPath((Join-Path $stage $entry.FullName))
       if ($entry.FullName.EndsWith('/')) { [IO.Directory]::CreateDirectory($path) | Out-Null; continue }

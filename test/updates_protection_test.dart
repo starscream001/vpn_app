@@ -31,6 +31,30 @@ class FakeGuard extends NativeGuard {
 
 void main() {
   test(
+    'PF protection rejects quick-pass layouts and earlier competing anchors',
+    () {
+      expect(
+        supportsPfLayout(
+          'scrub-anchor "com.apple/*" all fragment reassemble\nanchor "com.apple/*" all',
+          '250.ApplicationFirewall',
+        ),
+        true,
+      );
+      expect(
+        supportsPfLayout('pass quick all\nanchor "com.apple/*" all', ''),
+        false,
+      );
+      expect(supportsPfLayout('anchor "com.apple/*" all', '000.before'), false);
+      expect(
+        supportsPfLayout(
+          'anchor "com.apple/*" all',
+          '000.foxway\n250.ApplicationFirewall',
+        ),
+        true,
+      );
+    },
+  );
+  test(
     'Semver handles preview, stable, numeric components and build metadata',
     () {
       expect(compareVersions('v1.10.0', '1.9.9'), greaterThan(0));

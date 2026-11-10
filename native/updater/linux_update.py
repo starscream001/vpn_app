@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Local, consented bundle replacement. Never reads the OS credential vault."""
 import hashlib
+import errno
 import os
 from pathlib import Path
 import shutil
@@ -24,8 +25,17 @@ def validate(archive, expected):
             if p.as_posix() in names:raise ValueError('Duplicate entry')
             names.add(p.as_posix());size+=e.file_size
             if len(names)>20000 or size>2*1024**3:raise ValueError('Archive too large')
-        if not {'foxway','sing-box','amneziawg-go','awg','awg-quick','foxway-guard.py'}<=names:raise ValueError('Incomplete bundle')
+        if not {'foxway','sing-box','amneziawg-go','awg','awg-quick','foxway-guard.py','foxway-update.py'}<=names:raise ValueError('Incomplete bundle')
     return True
+
+
+def restore_capabilities(source,target):
+    try:capability=os.getxattr(source,'security.capability')
+    except OSError as e:
+        if e.errno in (errno.ENODATA,errno.ENOTSUP):return
+        raise
+    if os.geteuid()!=0:raise PermissionError('An administrator must preserve installed core capabilities')
+    os.setxattr(target,'security.capability',capability)
 
 
 def apply(archive,expected,target,pid):
@@ -41,6 +51,7 @@ def apply(archive,expected,target,pid):
         with zipfile.ZipFile(archive) as z:z.extractall(stage)
         for name in ('foxway','sing-box','amneziawg-go','awg','awg-quick'):(stage/name).chmod(0o755)
         for lib in stage.rglob('*.so'):lib.chmod(0o755)
+        restore_capabilities(target/'sing-box',stage/'sing-box')
         print('READY',flush=True)
         deadline=time.monotonic()+120
         while time.monotonic()<deadline:

@@ -552,10 +552,12 @@ class _FoxShellState extends State<FoxShell> {
       label: const Text('Импортировать профиль'),
     ),
     const SizedBox(height: 20),
-    TextButton(
-      onPressed: linkDialog,
-      child: const Text('Дополнительно: код FoxWay API'),
-    ),
+    if (c.apiUrl != null ||
+        const String.fromEnvironment('FOXWAY_API_URL').isNotEmpty)
+      TextButton(
+        onPressed: linkDialog,
+        child: const Text('Ввести код активации'),
+      ),
   ];
   Future<void> openBot() async {
     if (!await launchUrl(
@@ -1093,7 +1095,9 @@ class _FoxShellState extends State<FoxShell> {
   }
 
   Future<void> linkDialog() async {
-    final endpoint = TextEditingController(text: c.apiUrl ?? ''),
+    final endpoint = TextEditingController(
+          text: c.apiUrl ?? const String.fromEnvironment('FOXWAY_API_URL'),
+        ),
         code = TextEditingController();
     String? error;
     await showDialog<void>(

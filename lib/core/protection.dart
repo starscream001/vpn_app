@@ -6,6 +6,27 @@ import 'engine.dart';
 import 'profile.dart';
 import 'routing.dart';
 
+const pfAnchor = 'com.apple/000.foxway';
+
+// A pre-existing quick pass before our anchor would invalidate the protection.
+// Accept only the known default filter entry point, with our child first.
+bool supportsPfLayout(String rules, String anchors) {
+  final lines = const LineSplitter()
+      .convert(rules)
+      .map((s) => s.trim())
+      .where((s) => s.isNotEmpty && !s.startsWith('scrub-anchor "com.apple/*"'))
+      .toList();
+  if (lines.length != 1 || lines.single != 'anchor "com.apple/*" all') {
+    return false;
+  }
+  final own = pfAnchor.split('/').last;
+  return const LineSplitter()
+      .convert(anchors)
+      .map((s) => s.trim().split('/').last)
+      .where((s) => s.isNotEmpty)
+      .every((name) => name.compareTo(own) >= 0);
+}
+
 abstract interface class ProtectionControl {
   Future<void> prepareProtection(List<Profile> profiles);
   Future<void> releaseProtection();
@@ -79,8 +100,18 @@ class NativeGuard {
     }
     if (Platform.isMacOS && p.protocol == Protocol.vless) {
       final rules = await _run('/sbin/pfctl', ['-sr']);
+      final anchors = await _run('/sbin/pfctl', [
+        '-a',
+        'com.apple',
+        '-s',
+        'Anchors',
+      ]);
       if (rules.exitCode != 0 ||
-          !rules.stdout.toString().contains('anchor "com.apple/*"')) {
+          anchors.exitCode != 0 ||
+          !supportsPfLayout(
+            rules.stdout.toString(),
+            anchors.stdout.toString(),
+          )) {
         throw StateError(
           'В системном PF нет Apple anchor; требуется отдельная настройка администратора',
         );
@@ -92,12 +123,7 @@ class NativeGuard {
       }
       final body =
           'pass quick on lo0 all\npass out quick on utun88 all keep state (if-bound)\npass out quick proto tcp to ${address.address} port ${endpoint.port} keep state (if-bound)\npass out quick proto udp from any port 68 to any port 67\npass out quick inet6 proto icmp6 icmp6-type { 133, 134, 135, 136 }\nblock drop out quick all\n';
-      await _checked('/sbin/pfctl', [
-        '-a',
-        'com.apple/foxway',
-        '-f',
-        '-',
-      ], input: body);
+      await _checked('/sbin/pfctl', ['-a', pfAnchor, '-f', '-'], input: body);
       final tokenFile = File('/var/run/foxway-pf.token');
       if (!await tokenFile.exists()) {
         final enabled = await _run('/sbin/pfctl', ['-E']);
@@ -132,12 +158,7 @@ class NativeGuard {
     }
     if (Platform.isMacOS) {
       // Empty only FoxWay's anchor. Never disable or flush the system PF ruleset.
-      await _checked('/sbin/pfctl', [
-        '-a',
-        'com.apple/foxway',
-        '-f',
-        '-',
-      ], input: '');
+      await _checked('/sbin/pfctl', ['-a', pfAnchor, '-f', '-'], input: '');
       final file = File('/var/run/foxway-pf.token');
       if (await file.exists()) {
         final token = (await file.readAsString()).trim();

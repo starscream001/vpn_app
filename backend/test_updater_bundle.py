@@ -3,6 +3,7 @@ import importlib.util
 from pathlib import Path
 import tempfile
 import unittest
+from unittest.mock import patch
 import zipfile
 
 spec=importlib.util.spec_from_file_location('linux_update',Path(__file__).parents[1]/'native/updater/linux_update.py')
@@ -12,7 +13,7 @@ class UpdaterArchiveTests(unittest.TestCase):
         p=Path(folder)/'release.zip'
         with zipfile.ZipFile(p,'w') as z:
             if complete:
-                for name in ('foxway','sing-box','amneziawg-go','awg','awg-quick','foxway-guard.py'):z.writestr(name,b'fixture')
+                for name in ('foxway','sing-box','amneziawg-go','awg','awg-quick','foxway-guard.py','foxway-update.py'):z.writestr(name,b'fixture')
             if extra:z.writestr(extra,b'unsafe')
         return p,hashlib.sha256(p.read_bytes()).hexdigest()
     def test_valid_complete_bundle(self):
@@ -35,6 +36,14 @@ class UpdaterArchiveTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as folder:
             p,digest=self.archive(folder,complete=False)
             with self.assertRaises(ValueError):updater.validate(p,digest)
+    def test_unprivileged_update_cannot_drop_required_capabilities(self):
+        with patch.object(updater.os,'getxattr',return_value=b'existing',create=True),patch.object(updater.os,'geteuid',return_value=1000),patch.object(updater.os,'setxattr',create=True) as write:
+            with self.assertRaises(PermissionError):updater.restore_capabilities(Path('old'),Path('new'))
+            write.assert_not_called()
+    def test_privileged_update_preserves_existing_capabilities(self):
+        with patch.object(updater.os,'getxattr',return_value=b'existing',create=True),patch.object(updater.os,'geteuid',return_value=0),patch.object(updater.os,'setxattr',create=True) as write:
+            updater.restore_capabilities(Path('old'),Path('new'))
+            write.assert_called_once_with(Path('new'),'security.capability',b'existing')
     def test_symlink_rejected(self):
         with tempfile.TemporaryDirectory() as folder:
             p,_=self.archive(folder)
