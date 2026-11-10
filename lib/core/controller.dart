@@ -241,6 +241,7 @@ class FoxController extends ChangeNotifier {
           final result = await probe.check(engine);
           await _record(p, result);
           if (result.ok) {
+            error = null;
             active = p;
             failures = 0;
             lastSwitch = DateTime.now();

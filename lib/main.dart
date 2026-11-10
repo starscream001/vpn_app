@@ -4,6 +4,7 @@ import 'package:flutter/material.dart' hide ConnectionState;
 import 'package:flutter/services.dart';
 import 'core/controller.dart';
 import 'core/engine.dart';
+import 'core/native_engines.dart';
 import 'core/profile.dart';
 import 'core/routing.dart';
 import 'core/storage.dart';
@@ -12,7 +13,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final controller = FoxController(
     store: StateStore(SecureVault()),
-    engine: AndroidEngine(),
+    engine: platformEngine(),
     probe: HttpsProbe(
       Uri.parse(
         const String.fromEnvironment(
@@ -81,6 +82,24 @@ class FoxShell extends StatefulWidget {
 }
 
 class _FoxShellState extends State<FoxShell> {
+  late final AppLifecycleListener _lifecycle;
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(
+      onExitRequested: () async {
+        await c.engine.stop();
+        return AppExitResponse.exit;
+      },
+    );
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
   int page = 0;
   FoxController get c => widget.c;
   final labels = ['Главная', 'Серверы', 'Подписка', 'Ещё'];
@@ -208,7 +227,7 @@ class _FoxShellState extends State<FoxShell> {
                                   child: Padding(
                                     padding: EdgeInsets.all(16),
                                     child: Text(
-                                      'Предварительная версия интерфейса. VPN на этой платформе ещё не доступен.',
+                                      'Экспериментальный VLESS VPN. iOS требует подписанного расширения; desktop — прав на TUN. AmneziaWG на этих платформах ещё не доступен.',
                                     ),
                                   ),
                                 ),
@@ -279,7 +298,7 @@ class _FoxShellState extends State<FoxShell> {
             ),
             child: IconButton(
               tooltip: connected ? 'Отключить' : 'Подключить',
-              onPressed: busy || defaultTargetPlatform != TargetPlatform.android
+              onPressed: busy
                   ? null
                   : () => act(connected ? c.disconnect : c.connect),
               icon: busy

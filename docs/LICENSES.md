@@ -18,3 +18,7 @@ Hiddify не использован. [LICENSE.md](https://github.com/hiddify/hid
 Источники: [AWG Android](https://github.com/amnezia-vpn/amneziawg-android), [AWG Maven POM](https://repo.maven.apache.org/maven2/com/zaneschepke/amneziawg-android/2.3.7/amneziawg-android-2.3.7.pom), [AWG Go license](https://github.com/amnezia-vpn/amneziawg-go/blob/master/LICENSE), [Flutter plugin](https://github.com/blueboy-tm/flutter_v2ray), [AndroidLibXrayLite](https://github.com/2dust/AndroidLibXrayLite), [Xray-core](https://github.com/XTLS/Xray-core).
 
 Собственный код FoxWay распространяется под MIT (корневой LICENSE). Это не заменяет лицензии зависимостей. Перед коммерческим release необходимо включить полный набор notices всех транзитивных .so/AAR, зафиксировать исходники ядер, проверить требования LGPL к способу поставки, воспроизводимость и Google Play 16 KB pages. Текущий проект — preview; юридическая готовность бинарного релиза не заявлена.
+
+## Изменения 0.2.0
+
+Подключён sing_box 1.0.0 (GPL-3.0-or-later) для iOS Network Extension и официальный sing-box 1.14.4 для desktop. Собственный MIT-код совместим с GPL; условия распространения **собранного приложения, включающего GPL-компоненты, — GPL**, с соответствующими исходниками и build scripts. Запрета платных подписок GPL не содержит. Это не Hiddify. Пакет desktop core закреплён по URL/version и SHA-256 в scripts/sing_box_assets.json; Apple XCFramework проверяется по SHA в upstream Package.swift. Не публиковать бинарный релиз 0.2 до добавления полного corresponding-source bundle ядер и notices.

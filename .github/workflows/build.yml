@@ -19,6 +19,11 @@ jobs:
       - run: dart format --output=none --set-exit-if-changed lib test
       - run: flutter analyze
       - run: flutter test --coverage
+      - name: Validate configurations with the official native core
+        run: |
+          python3 scripts/install_desktop_core.py build/native
+          build/native/sing-box check -c build/review/sing-desktop.json
+          build/native/sing-box check -c build/review/sing-ios.json
       - run: python3 -m unittest discover -s backend -v
       - uses: actions/upload-artifact@v4
         if: always()
@@ -76,9 +81,18 @@ jobs:
       - uses: ./.github/actions/flutter
       - run: flutter pub get --enforce-lockfile
       - run: flutter build ${{ matrix.target }} --release
+      - name: Bundle verified native TUN core
+        shell: bash
+        run: |
+          if [ "${{ matrix.target }}" = "macos" ]; then
+            python3 scripts/install_desktop_core.py "build/macos/Build/Products/Release/FoxWay VPN.app/Contents/MacOS"
+            codesign --force --deep --sign - "build/macos/Build/Products/Release/FoxWay VPN.app"
+          else
+            python3 scripts/install_desktop_core.py "${{ matrix.path }}"
+          fi
       - uses: actions/upload-artifact@v4
         with:
-          name: ${{ matrix.target }}-UI-preview-no-VPN
+          name: ${{ matrix.target }}-VLESS-TUN-experimental
           path: ${{ matrix.path }}
   ios:
     needs: checks
@@ -90,5 +104,5 @@ jobs:
       - run: flutter build ios --release --no-codesign
       - uses: actions/upload-artifact@v4
         with:
-          name: iOS-unsigned-UI-preview-no-VPN
+          name: iOS-unsigned-VLESS-PacketTunnel-experimental
           path: build/ios/iphoneos/Runner.app
