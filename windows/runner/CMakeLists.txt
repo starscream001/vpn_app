@@ -38,3 +38,7 @@ target_include_directories(${BINARY_NAME} PRIVATE "${CMAKE_SOURCE_DIR}")
 
 # Run the Flutter tool portions of the build. This must not be removed.
 add_dependencies(${BINARY_NAME} flutter_assemble)
+
+# runner.exe.manifest owns UAC; suppress the linker default asInvoker fragment.
+# https://learn.microsoft.com/cpp/build/reference/manifestuac-embeds-uac-information-in-manifest
+target_link_options(${BINARY_NAME} PRIVATE "/MANIFESTUAC:NO")
