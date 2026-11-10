@@ -6,6 +6,7 @@ String singConfig(
   Profile profile,
   RoutingPolicy policy, {
   bool desktop = false,
+  bool proxyProbe = false,
   int probePort = 10809,
   int apiPort = 0,
   String secret = '',
@@ -67,7 +68,7 @@ String singConfig(
         'strict_route': true,
         'stack': 'system',
       },
-      if (desktop)
+      if (desktop || proxyProbe)
         {
           'type': 'http',
           'tag': 'quality',
@@ -85,7 +86,7 @@ String singConfig(
       'rules': [
         {'action': 'sniff'},
         {'protocol': 'dns', 'action': 'hijack-dns'},
-        if (desktop)
+        if (desktop || proxyProbe)
           {
             'inbound': ['quality'],
             'outbound': 'proxy',

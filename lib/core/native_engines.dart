@@ -18,7 +18,11 @@ TunnelEngine platformEngine() => Platform.isAndroid
     ? AppleTunnelEngine()
     : DesktopTunnelEngine();
 
-class AppleTunnelEngine implements TunnelEngine {
+class AppleTunnelEngine implements TunnelEngine, ProxyProbeEngine {
+  int _probePort = 0;
+  @override
+  String? get httpProxy =>
+      _activeProtocol == Protocol.vless ? 'PROXY 127.0.0.1:$_probePort' : null;
   static const _awg = MethodChannel("app.foxway/apple-awg");
   Protocol? _activeProtocol;
   final _native = SingBoxPlatform.instance;
@@ -69,7 +73,15 @@ class AppleTunnelEngine implements TunnelEngine {
       await _awg.invokeMethod<void>('stop');
       throw TimeoutException('AmneziaWG extension не запустился');
     }
-    final config = singConfig(profile, policy);
+    final socket = await ServerSocket.bind(InternetAddress.loopbackIPv4, 0);
+    _probePort = socket.port;
+    await socket.close();
+    final config = singConfig(
+      profile,
+      policy,
+      proxyProbe: true,
+      probePort: _probePort,
+    );
     await _init();
     await _awg.invokeMethod<void>('stop');
     if (!await _native.requestVpnPermission()) {

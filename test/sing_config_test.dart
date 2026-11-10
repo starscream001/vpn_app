@@ -40,6 +40,22 @@ void main() {
       );
     },
   );
+  test('Apple probe precedes direct domains without exposing a Clash API', () {
+    final j =
+        jsonDecode(
+              singConfig(
+                parseProfiles(link).single,
+                const RoutingPolicy(domains: ['probe.example']),
+                proxyProbe: true,
+                probePort: 18081,
+              ),
+            )
+            as Map;
+    expect(j['inbounds'][1]['listen'], '127.0.0.1');
+    expect(j['route']['rules'][2]['inbound'], ['quality']);
+    expect(j['route']['rules'][2]['outbound'], 'proxy');
+    expect(j.containsKey('experimental'), false);
+  });
   test('native validation fixtures', () async {
     final key = base64Url
         .encode(List.generate(32, (i) => i + 1))
@@ -58,6 +74,6 @@ void main() {
     );
     await File(
       'build/review/sing-ios.json',
-    ).writeAsString(singConfig(p, const RoutingPolicy()));
+    ).writeAsString(singConfig(p, const RoutingPolicy(), proxyProbe: true));
   });
 }
