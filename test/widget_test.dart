@@ -115,6 +115,22 @@ void main() {
       ).writeAsBytes(data!.buffer.asUint8List());
       image.dispose();
     });
+    for (final entry in {
+      'Подписка': 'subscription',
+      'Ещё': 'settings',
+    }.entries) {
+      await tester.tap(find.text(entry.key).last);
+      await tester.pumpAndSettle();
+      expect(tester.takeException(), isNull);
+      await tester.runAsync(() async {
+        final image = await boundary.toImage();
+        final data = await image.toByteData(format: ui.ImageByteFormat.png);
+        await File(
+          'build/review/${entry.value}.png',
+        ).writeAsBytes(data!.buffer.asUint8List());
+        image.dispose();
+      });
+    }
     debugDefaultTargetPlatformOverride = null;
     c.dispose();
   });

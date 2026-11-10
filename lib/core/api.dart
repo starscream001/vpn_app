@@ -56,16 +56,92 @@ class ApiClient {
   }
 }
 
-Future<List<Profile>> downloadSubscription(String url) async {
+class SubscriptionDownload {
+  SubscriptionDownload(this.profiles, this.skipped, this.expiresAt);
+  final List<Profile> profiles;
+  final int skipped;
+  final DateTime? expiresAt;
+}
+
+SubscriptionDownload decodeSubscription(
+  String input,
+  String source, {
+  DateTime? expiresAt,
+}) {
+  var text = input.trim();
+  if (!text.startsWith('[Interface]') && !text.contains('://')) {
+    try {
+      text = utf8.decode(base64.decode(base64.normalize(text))).trim();
+    } catch (_) {}
+  }
+  if (text.startsWith('[Interface]')) {
+    return SubscriptionDownload(
+      parseProfiles(text, source: source)
+          .map(
+            (p) => Profile.fromJson({
+              ...p.toJson(),
+              'id': configId('$source:${p.id}'),
+              if (expiresAt != null) 'expiresAt': expiresAt.toIso8601String(),
+            }),
+          )
+          .toList(),
+      0,
+      expiresAt,
+    );
+  }
+  final profiles = <Profile>[];
+  var skipped = 0;
+  for (final line
+      in const LineSplitter().convert(text).where((s) => s.trim().isNotEmpty)) {
+    final value = line.trim();
+    if (!value.startsWith('vless://')) {
+      skipped++;
+      continue;
+    }
+    try {
+      profiles.addAll(parseProfiles(value, source: source));
+    } on FormatException {
+      skipped++;
+    }
+  }
+  if (profiles.isEmpty) {
+    throw const FormatException(
+      'В подписке нет совместимых VLESS TCP Reality/TLS или AWG-профилей',
+    );
+  }
+  return SubscriptionDownload(
+    profiles
+        .map(
+          (p) => Profile.fromJson({
+            ...p.toJson(),
+            'id': configId('$source:${p.id}'),
+            if (expiresAt != null) 'expiresAt': expiresAt.toIso8601String(),
+          }),
+        )
+        .toList(),
+    skipped,
+    expiresAt,
+  );
+}
+
+Future<SubscriptionDownload> fetchSubscription(String url) async {
   final uri = requireHttps(url);
   final client = HttpClient()..connectionTimeout = const Duration(seconds: 10);
   try {
     final req = await client.getUrl(uri).timeout(const Duration(seconds: 15));
     req.followRedirects = false;
+    req.headers.set('User-Agent', 'FoxWay/0.3.0');
     final res = await req.close().timeout(const Duration(seconds: 15));
     if (res.statusCode != 200) {
-      throw HttpException('Подписка: ${res.statusCode}');
+      throw HttpException('Подписка: HTTP ${res.statusCode}');
     }
+    final expiry = RegExp(
+      r'(?:^|;)\s*expire=(\d+)',
+    ).firstMatch(res.headers.value('subscription-userinfo') ?? '');
+    final seconds = expiry == null ? 0 : int.parse(expiry[1]!);
+    final expiresAt = seconds > 0
+        ? DateTime.fromMillisecondsSinceEpoch(seconds * 1000, isUtc: true)
+        : null;
     final bytes = <int>[];
     await for (final chunk in res.timeout(const Duration(seconds: 15))) {
       bytes.addAll(chunk);
@@ -73,10 +149,36 @@ Future<List<Profile>> downloadSubscription(String url) async {
         throw const FormatException('Подписка больше 1 МБ');
       }
     }
-    return parseProfiles(utf8.decode(bytes), source: configId(url));
+    return decodeSubscription(
+      utf8.decode(bytes),
+      configId(url),
+      expiresAt: expiresAt,
+    );
   } finally {
     client.close(force: true);
   }
+}
+
+Future<List<Profile>> downloadSubscription(String url) async =>
+    (await fetchSubscription(url)).profiles;
+
+class SubscriptionSource {
+  SubscriptionSource(this.url, {this.lastSuccess, this.skipped = 0});
+  final String url;
+  DateTime? lastSuccess;
+  int skipped;
+  String get id => configId(url);
+  Map<String, dynamic> toJson() => {
+    'url': url,
+    'lastSuccess': lastSuccess?.toIso8601String(),
+    'skipped': skipped,
+  };
+  factory SubscriptionSource.fromJson(Map<String, dynamic> j) =>
+      SubscriptionSource(
+        requireHttps(j['url'] as String).toString(),
+        lastSuccess: DateTime.tryParse(j['lastSuccess'] as String? ?? ''),
+        skipped: j['skipped'] as int? ?? 0,
+      );
 }
 
 class QualityReport {

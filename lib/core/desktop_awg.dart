@@ -78,7 +78,10 @@ class AppleAwgOnlyEngine implements TunnelEngine {
         'AWG Apple: доменные и app-исключения ещё не поддержаны',
       );
     }
-    await channel.invokeMethod<void>('start', {'config': p.config});
+    await channel.invokeMethod<void>('start', {
+      'config': p.config,
+      'killSwitch': policy.killSwitch,
+    });
     final deadline = DateTime.now().add(const Duration(seconds: 30));
     while (DateTime.now().isBefore(deadline)) {
       if ((await traffic()).up) return;

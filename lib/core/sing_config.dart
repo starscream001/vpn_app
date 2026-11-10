@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:io';
 import 'profile.dart';
 import 'routing.dart';
 
@@ -62,6 +63,12 @@ String singConfig(
       {
         'type': 'tun',
         'tag': 'tun-in',
+        if (desktop)
+          'interface_name': Platform.isMacOS
+              ? 'utun88'
+              : Platform.isWindows
+              ? 'FoxWayVless'
+              : 'fwvless0',
         'address': ['172.30.89.1/30', 'fd89:1234::1/126'],
         'mtu': 1400,
         'auto_route': true,
@@ -82,6 +89,8 @@ String singConfig(
     ],
     'route': {
       'auto_detect_interface': desktop,
+      if (desktop && policy.killSwitch && Platform.isLinux)
+        'default_mark': 0x4657,
       'default_domain_resolver': 'bootstrap',
       'rules': [
         {'action': 'sniff'},

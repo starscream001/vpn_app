@@ -5,6 +5,8 @@ import 'engine.dart';
 import 'profile.dart';
 import 'routing.dart';
 import 'storage.dart';
+import 'updates.dart' show appVersion;
+import 'protection.dart';
 
 enum ConnectionState { disconnected, connecting, connected, checking, error }
 
@@ -18,6 +20,9 @@ class FoxController extends ChangeNotifier {
   final TunnelEngine engine;
   final QualityProbe probe;
   List<Profile> profiles = [];
+  List<SubscriptionSource> subscriptions = [];
+  DateTime? _lastSubscriptionAttempt;
+  String? subscriptionNotice;
   Set<String> revokedIds = {};
   DateTime? _lastRefresh;
   RoutingPolicy routing = const RoutingPolicy();
@@ -39,6 +44,9 @@ class FoxController extends ChangeNotifier {
       final j = await store.load();
       profiles = (j['profiles'] as List? ?? [])
           .map((p) => Profile.fromJson(Map<String, dynamic>.from(p)))
+          .toList();
+      subscriptions = (j['subscriptions'] as List? ?? [])
+          .map((s) => SubscriptionSource.fromJson(Map<String, dynamic>.from(s)))
           .toList();
       routing = RoutingPolicy.fromJson(
         Map<String, dynamic>.from(j['routing'] ?? {}),
@@ -79,6 +87,7 @@ class FoxController extends ChangeNotifier {
     final snapshot = {
       'revokedIds': revokedIds.toList(),
       'profiles': profiles.map((p) => p.toJson()).toList(),
+      'subscriptions': subscriptions.map((s) => s.toJson()).toList(),
       'routing': routing.toJson(),
       'mode': mode.name,
       'selectedId': selectedId,
@@ -96,16 +105,91 @@ class FoxController extends ChangeNotifier {
   }
 
   Future<void> importText(String text) async {
-    final imported = text.trim().startsWith('https://')
-        ? await downloadSubscription(text.trim())
-        : parseProfiles(text);
-    profiles = mergeCatalog(profiles, imported, now: DateTime.now());
+    if (text.trim().startsWith('https://')) {
+      final source = SubscriptionSource(requireHttps(text.trim()).toString());
+      await _refreshSource(source);
+      subscriptions.removeWhere((s) => s.id == source.id);
+      subscriptions.add(source);
+    } else {
+      profiles = mergeCatalog(
+        profiles,
+        parseProfiles(text),
+        now: DateTime.now(),
+      );
+    }
+    await save();
+    notifyListeners();
+  }
+
+  Future<void> _refreshSource(SubscriptionSource source) async {
+    final download = await fetchSubscription(source.url);
+    // Expiry from the trusted subscription response updates even an unchanged URI.
+    final ids = download.profiles.map((p) => p.id).toSet();
+    final configs = download.profiles.map((p) => p.config).toSet();
+    profiles = mergeCatalog(
+      profiles
+          .where(
+            (p) =>
+                !(p.source == source.id &&
+                    (ids.contains(p.id) || configs.contains(p.config))),
+          )
+          .map(
+            (p) => p.source == source.id && download.expiresAt != null
+                ? Profile.fromJson({
+                    ...p.toJson(),
+                    'expiresAt': download.expiresAt!.toIso8601String(),
+                  })
+                : p,
+          )
+          .toList(),
+      download.profiles.map((p) {
+        final previous = profiles
+            .where(
+              (old) =>
+                  old.id == p.id ||
+                  (old.source == source.id && old.config == p.config),
+            )
+            .firstOrNull;
+        return Profile.fromJson({
+          ...p.toJson(),
+          if (previous?.lastSuccess != null)
+            'lastSuccess': previous!.lastSuccess!.toIso8601String(),
+          if (previous?.latency != null) 'latency': previous!.latency,
+        });
+      }).toList(),
+      now: DateTime.now(),
+    );
+    source.lastSuccess = DateTime.now();
+    source.skipped = download.skipped;
+    subscriptionNotice = download.skipped > 0
+        ? 'Импортировано ${download.profiles.length}; несовместимых профилей: ${download.skipped}'
+        : null;
+  }
+
+  Future<void> refreshSubscriptions() async {
+    var failed = false;
+    for (final source in subscriptions) {
+      try {
+        await _refreshSource(source);
+      } catch (_) {
+        failed = true;
+      }
+    }
+    if (failed) {
+      subscriptionNotice =
+          'Подписка временно недоступна. Последние рабочие профили сохранены.';
+    }
     await save();
     notifyListeners();
   }
 
   Future<void> updateRouting(RoutingPolicy policy) async {
     if (active != null || _busy) throw StateError('Сначала отключите VPN');
+    if (routing.killSwitch &&
+        !policy.killSwitch &&
+        engine is ProtectionControl) {
+      await (engine as ProtectionControl).releaseProtection();
+    }
     routing = policy;
     await save();
     notifyListeners();
@@ -131,7 +215,7 @@ class FoxController extends ChangeNotifier {
     final base = requireHttps(endpoint);
     final res = await ApiClient(base).request(
       '/v1/auth/exchange',
-      body: {'code': code, 'client': 'foxway', 'version': '0.2.0'},
+      body: {'code': code, 'client': 'foxway', 'version': appVersion},
     );
     final access = res['access_token'];
     if (access is! String || access.isEmpty) {
@@ -184,7 +268,7 @@ class FoxController extends ChangeNotifier {
         !profiles.any(
           (p) => p.id == active!.id && p.config == active!.config,
         )) {
-      await disconnect();
+      await disconnect(releaseProtection: false);
     }
     await save();
     notifyListeners();
@@ -231,11 +315,15 @@ class FoxController extends ChangeNotifier {
           .where(
             (p) => p.id != skipId && (selectedId == null || p.id == selectedId),
           )
-          .take(4);
+          .take(4)
+          .toList();
+      if (routing.killSwitch && engine is ProtectionControl) {
+        await (engine as ProtectionControl).prepareProtection(candidates);
+      }
       if (candidates.isEmpty) throw StateError('Добавьте профиль или подписку');
       for (final p in candidates) {
         try {
-          await engine.start(p, routing);
+          await engine.start(p, routing.enforced);
           state = ConnectionState.checking;
           notifyListeners();
           final result = await probe.check(engine);
@@ -270,10 +358,16 @@ class FoxController extends ChangeNotifier {
     }
   }
 
-  Future<void> disconnect() async {
+  Future<void> disconnect({bool releaseProtection = true}) async {
     if (_busy) return;
     _session++;
-    await engine.stop();
+    if (releaseProtection &&
+        routing.killSwitch &&
+        engine is ProtectionControl) {
+      await (engine as ProtectionControl).releaseProtection();
+    } else {
+      await engine.stop();
+    }
     active = null;
     traffic = const Traffic(0, 0, false);
     state = ConnectionState.disconnected;
@@ -294,10 +388,17 @@ class FoxController extends ChangeNotifier {
           await refresh();
         } catch (_) {}
       }
+      if (subscriptions.isNotEmpty &&
+          (_lastSubscriptionAttempt == null ||
+              DateTime.now().difference(_lastSubscriptionAttempt!).inMinutes >=
+                  15)) {
+        _lastSubscriptionAttempt = DateTime.now();
+        await refreshSubscriptions();
+      }
       profiles.removeWhere((p) => !p.usable(DateTime.now()));
       if (active != null) {
         if (!profiles.any((p) => p.id == active!.id)) {
-          await disconnect();
+          await disconnect(releaseProtection: false);
           await save();
           return;
         }
@@ -315,7 +416,7 @@ class FoxController extends ChangeNotifier {
               DateTime.now().difference(lastSwitch!).inMinutes >= 2) {
             // Demote failed candidate for this bounded reconnect attempt.
 
-            await disconnect();
+            await disconnect(releaseProtection: false);
             await connect(skipId: p.id);
 
             await save();

@@ -34,13 +34,30 @@ android {
         versionName = flutter.versionName
     }
 
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+    signingConfigs {
+        System.getenv("FOXWAY_PREVIEW_KEYSTORE_PATH")?.let { path ->
+            getByName("debug") {
+                storeFile = file(path)
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
+        System.getenv("FOXWAY_RELEASE_KEYSTORE_PATH")?.let { path ->
+            create("production") {
+                storeFile = file(path)
+                storePassword = System.getenv("FOXWAY_KEYSTORE_PASSWORD")
+                keyAlias = System.getenv("FOXWAY_KEY_ALIAS")
+                keyPassword = System.getenv("FOXWAY_KEY_PASSWORD")
+            }
         }
     }
+    buildTypes {
+        release {
+            signingConfig = signingConfigs.findByName("production") ?: signingConfigs.getByName("debug")
+        }
+    }
+
 }
 
 kotlin {

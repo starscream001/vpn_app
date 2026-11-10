@@ -15,7 +15,13 @@ final class AwgControl {
             guard error == nil else { result(FlutterError(code: "VPN", message: "Cannot load VPN profiles", details: nil)); return }
             let manager = managers?.first { ($0.protocolConfiguration as? NETunnelProviderProtocol)?.providerBundleIdentifier == self.bundle } ?? NETunnelProviderManager()
             switch call.method {
-            case "stop": manager.connection.stopVPNTunnel(); result(nil)
+            case "stop":
+                guard manager.protocolConfiguration != nil else { result(nil); return }
+                manager.isOnDemandEnabled = false
+                manager.saveToPreferences { error in
+                    guard error == nil else { result(FlutterError(code: "VPN_STOP", message: "Cannot disable on-demand protection", details: nil)); return }
+                    manager.connection.stopVPNTunnel(); result(nil)
+                }
             case "stats":
                 guard manager.connection.status == .connected, let session = manager.connection as? NETunnelProviderSession else {
                     result(["up": false, "rx": 0, "tx": 0]); return
@@ -47,6 +53,15 @@ final class AwgControl {
                 let proto = NETunnelProviderProtocol()
                 proto.providerBundleIdentifier = self.bundle
                 proto.serverAddress = "FoxWay AmneziaWG"
+                let protected = args["killSwitch"] as? Bool ?? false
+                proto.includeAllNetworks = protected
+                proto.excludeLocalNetworks = !protected
+                if #available(iOS 16.4, macOS 13.3, *) { proto.excludeAPNs = !protected }
+                if protected {
+                    let rule = NEOnDemandRuleConnect(); rule.interfaceTypeMatch = .any
+                    manager.onDemandRules = [rule]
+                }
+                manager.isOnDemandEnabled = protected
                 proto.providerConfiguration = ["keychainAccount": account]
                 manager.protocolConfiguration = proto
                 manager.localizedDescription = "FoxWay AmneziaWG"

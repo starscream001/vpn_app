@@ -1,6 +1,12 @@
 package app.foxway.foxway
 
 import android.app.Activity
+import android.content.Context
+import android.os.Build
+import android.net.Uri
+import android.content.pm.PackageManager
+import androidx.core.content.FileProvider
+import java.io.File
 import android.content.Intent
 import android.net.VpnService
 import io.flutter.embedding.android.FlutterActivity
@@ -36,6 +42,39 @@ class MainActivity : FlutterActivity() {
         MethodChannel(flutterEngine.dartExecutor.binaryMessenger, "app.foxway/tunnel")
             .setMethodCallHandler { call, result ->
                 when (call.method) {
+                    "installUpdate" -> {
+                        try {
+                            val source = File(call.argument<String>("path") ?: "").canonicalFile
+                            if (!source.path.startsWith(cacheDir.canonicalPath + "/") || !source.name.endsWith(".apk")) throw IllegalArgumentException()
+                            val flags = if (Build.VERSION.SDK_INT >= 28) PackageManager.GET_SIGNING_CERTIFICATES else PackageManager.GET_SIGNATURES
+                            val archive = packageManager.getPackageArchiveInfo(source.path, flags) ?: throw IllegalArgumentException()
+                            val current = packageManager.getPackageInfo(packageName, flags)
+                            val version = if (Build.VERSION.SDK_INT >= 28) archive.longVersionCode else archive.versionCode.toLong()
+                            val installedVersion = if (Build.VERSION.SDK_INT >= 28) current.longVersionCode else current.versionCode.toLong()
+                            @Suppress("DEPRECATION")
+                            val a = if (Build.VERSION.SDK_INT >= 28) archive.signingInfo?.apkContentsSigners else archive.signatures
+                            @Suppress("DEPRECATION")
+                            val b = if (Build.VERSION.SDK_INT >= 28) current.signingInfo?.apkContentsSigners else current.signatures
+                            if (archive.packageName != packageName || version <= installedVersion || a == null || b == null || a.map { it.toCharsString() }.sorted() != b.map { it.toCharsString() }.sorted()) {
+                                result.error("SIGNATURE", "Новая версия подписана другим ключом или не является обновлением. Установка отменена; данные сохранены.", null)
+                            } else if (Build.VERSION.SDK_INT >= 26 && !packageManager.canRequestPackageInstalls()) {
+                                startActivity(Intent("android.settings.MANAGE_UNKNOWN_APP_SOURCES", Uri.parse("package:$packageName")))
+                                result.error("INSTALL_PERMISSION", "Разрешите обновления FoxWay и повторите установку", null)
+                            } else {
+                                val folder = File(cacheDir, "updates"); folder.mkdirs()
+                                val target = File(folder, "update.apk"); source.copyTo(target, overwrite=true)
+                                val uri = FileProvider.getUriForFile(this, "$packageName.updates", target)
+                                startActivity(Intent(Intent.ACTION_VIEW).setDataAndType(uri,"application/vnd.android.package-archive").addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION))
+                                result.success(null)
+                            }
+                        } catch (_: Exception) { result.error("UPDATE", "Не удалось открыть проверенный APK", null) }
+                    }
+                    "protectionStatus" -> {
+                        try {
+                            val probe = VpnPolicyProbe(applicationContext)
+                            result.success(if (Build.VERSION.SDK_INT >= 29) mapOf("lockdown" to probe.isLockdownEnabled, "alwaysOn" to probe.isAlwaysOn) else mapOf("lockdown" to false, "unsupported" to true))
+                        } catch (_: Exception) { result.success(mapOf("lockdown" to false)) }
+                    }
                     "apps" -> {
                         val launcher = Intent(Intent.ACTION_MAIN).addCategory(Intent.CATEGORY_LAUNCHER)
                         val apps = packageManager.queryIntentActivities(launcher, 0)
@@ -105,3 +144,6 @@ class MainActivity : FlutterActivity() {
         }
     }
 }
+
+// Public VpnService policy APIs use the app Context/UID; no VPN is created by this probe.
+private class VpnPolicyProbe(context: Context) : VpnService() { init { attachBaseContext(context) } }

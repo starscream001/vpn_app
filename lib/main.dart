@@ -1,3 +1,10 @@
+import 'dart:io';
+import 'dart:convert';
+import 'dart:async';
+import 'dart:ffi' show Abi;
+import 'package:url_launcher/url_launcher.dart';
+import 'core/updates.dart';
+import 'core/protection.dart';
 import 'dart:ui' show AppExitResponse;
 import 'package:flutter/foundation.dart';
 import 'package:file_selector/file_selector.dart';
@@ -14,7 +21,7 @@ void main() {
   WidgetsFlutterBinding.ensureInitialized();
   final controller = FoxController(
     store: StateStore(SecureVault()),
-    engine: platformEngine(),
+    engine: ProtectedEngine(platformEngine()),
     probe: HttpsProbe(
       Uri.parse(
         const String.fromEnvironment(
@@ -24,7 +31,7 @@ void main() {
       ),
     ),
   );
-  runApp(FoxWay(controller: controller));
+  runApp(FoxWay(controller: controller, updates: UpdateService()..start()));
   controller.init();
 }
 
@@ -35,7 +42,8 @@ const bg = Color(0xff081117),
     muted = Color(0xffa6bac4);
 
 class FoxWay extends StatelessWidget {
-  const FoxWay({super.key, required this.controller});
+  const FoxWay({super.key, required this.controller, this.updates});
+  final UpdateService? updates;
   final FoxController controller;
   @override
   Widget build(BuildContext context) => MaterialApp(
@@ -71,12 +79,13 @@ class FoxWay extends StatelessWidget {
         indicatorColor: Color(0xff16483f),
       ),
     ),
-    home: FoxShell(c: controller),
+    home: FoxShell(c: controller, updates: updates),
   );
 }
 
 class FoxShell extends StatefulWidget {
-  const FoxShell({super.key, required this.c});
+  const FoxShell({super.key, required this.c, this.updates});
+  final UpdateService? updates;
   final FoxController c;
   @override
   State<FoxShell> createState() => _FoxShellState();
@@ -84,6 +93,7 @@ class FoxShell extends StatefulWidget {
 
 class _FoxShellState extends State<FoxShell> {
   late final AppLifecycleListener _lifecycle;
+  late final UpdateService updates = widget.updates ?? UpdateService();
   @override
   void initState() {
     super.initState();
@@ -98,6 +108,7 @@ class _FoxShellState extends State<FoxShell> {
   @override
   void dispose() {
     _lifecycle.dispose();
+    updates.dispose();
     super.dispose();
   }
 
@@ -131,7 +142,7 @@ class _FoxShellState extends State<FoxShell> {
 
   @override
   Widget build(BuildContext context) => ListenableBuilder(
-    listenable: c,
+    listenable: Listenable.merge([c, updates]),
     builder: (context, _) => Scaffold(
       appBar: AppBar(
         backgroundColor: bg,
@@ -178,10 +189,10 @@ class _FoxShellState extends State<FoxShell> {
             onPressed: () => showAboutDialog(
               context: context,
               applicationName: 'FoxWay VPN',
-              applicationVersion: '0.1.0 • Android preview',
+              applicationVersion: appVersion,
               children: [
                 const Text(
-                  'Независимый клиент. Системные туннели пока реализованы для Android.\n'
+                  'Независимый VPN-клиент для пяти платформ. Native интеграции требуют проверки на устройствах.\n'
                   'AmneziaWG: Apache-2.0 / MIT. Xray: MPL-2.0. AndroidLibXrayLite: LGPL-3.0.\n'
                   'Исходники и условия: github.com/starscream001/vpn_app',
                 ),
@@ -385,11 +396,13 @@ class _FoxShellState extends State<FoxShell> {
             ),
           ),
         ),
-      if (c.routing.russianSitesDirect)
+      if (c.routing.russianSitesDirect || c.routing.killSwitch)
         Padding(
           padding: const EdgeInsets.symmetric(vertical: 12),
           child: Text(
-            c.active?.protocol == Protocol.amnezia
+            c.routing.killSwitch
+                ? 'Строгая защита: все сайты и приложения через VPN'
+                : c.active?.protocol == Protocol.amnezia
                 ? 'Amnezia: российские сайты сейчас идут через VPN. Доменные исключения доступны в VLESS.'
                 : 'VLESS: сайты .ru, .рф и .su — напрямую',
             style: const TextStyle(color: muted),
@@ -475,45 +488,84 @@ class _FoxShellState extends State<FoxShell> {
     heading('Подписка'),
     Card(
       child: ListTile(
-        leading: const Icon(Icons.workspace_premium_outlined, color: teal),
-        title: Text(c.token == null ? 'Привяжите FoxWay' : 'FoxWay привязан'),
-        subtitle: const Text('Одноразовый код из Telegram-бота'),
+        leading: const Icon(Icons.telegram),
+        title: const Text('FoxWay в Telegram'),
+        subtitle: const Text('@Ilyavpnadmin_bot • существующая подписка'),
+        trailing: const Icon(Icons.open_in_new),
+        onTap: () => act(() => openBot()),
       ),
+    ),
+    const SizedBox(height: 12),
+    const Text(
+      'Откройте бота → «Мои подписки» → скопируйте VPN-ссылку. Вернитесь в FoxWay и добавьте её. Токен бота приложению не нужен.',
+      style: TextStyle(color: muted),
     ),
     const SizedBox(height: 16),
     FilledButton.icon(
-      onPressed: linkDialog,
-      icon: const Icon(Icons.link),
-      label: const Text('Ввести код из Telegram'),
+      onPressed: importDialog,
+      icon: const Icon(Icons.add_link),
+      label: const Text('Добавить ссылку подписки'),
     ),
     const SizedBox(height: 12),
     OutlinedButton.icon(
-      onPressed: c.token == null ? null : () => act(c.refresh),
+      onPressed: c.subscriptions.isEmpty && c.token == null
+          ? null
+          : () => act(() async {
+              await c.refreshSubscriptions();
+              if (c.token != null) await c.refresh();
+            }),
       icon: const Icon(Icons.refresh),
       label: const Text('Обновить серверы'),
     ),
-    const SizedBox(height: 24),
+    for (final source in c.subscriptions)
+      Card(
+        child: ListTile(
+          leading: const Icon(Icons.sync),
+          title: Text(Uri.parse(source.url).host),
+          subtitle: Text(
+            'Автообновление каждые 15 минут • несовместимых: ${source.skipped}',
+          ),
+        ),
+      ),
+    if (c.subscriptionNotice != null)
+      Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Text(
+          c.subscriptionNotice!,
+          style: const TextStyle(color: muted),
+        ),
+      ),
+    const SizedBox(height: 20),
     const Text(
       'Сторонние профили',
       style: TextStyle(fontSize: 20, fontWeight: FontWeight.w600),
     ),
     const SizedBox(height: 8),
     const Text(
-      'Работают независимо от подписки FoxWay. Импортируйте VLESS-ссылку, HTTPS-подписку или файл AmneziaWG.',
+      'Можно добавить свой VLESS, HTTPS-подписку или AmneziaWG .conf. Доступные протоколы определяются профилем.',
       style: TextStyle(color: muted),
     ),
     const SizedBox(height: 12),
     OutlinedButton.icon(
       onPressed: importDialog,
-      icon: const Icon(Icons.add),
-      label: const Text('Добавить сторонний профиль'),
+      icon: const Icon(Icons.upload_file),
+      label: const Text('Импортировать профиль'),
     ),
-    const SizedBox(height: 24),
-    const Text(
-      'Интеграция с ботом требует адреса API FoxWay. Токен бота в приложение не передаётся.',
-      style: TextStyle(color: muted),
+    const SizedBox(height: 20),
+    TextButton(
+      onPressed: linkDialog,
+      child: const Text('Дополнительно: код FoxWay API'),
     ),
   ];
+  Future<void> openBot() async {
+    if (!await launchUrl(
+      Uri.parse('https://t.me/Ilyavpnadmin_bot'),
+      mode: LaunchMode.externalApplication,
+    )) {
+      throw StateError('Не удалось открыть Telegram');
+    }
+  }
+
   List<Widget> settings() => [
     heading('Ещё'),
     Card(
@@ -523,15 +575,18 @@ class _FoxShellState extends State<FoxShell> {
           'VLESS: .ru, .рф, .su. Для AmneziaWG пока недоступно. Другие домены можно добавить ниже.',
         ),
         value: c.routing.russianSitesDirect,
-        onChanged: (v) => act(
-          () => c.updateRouting(
-            RoutingPolicy(
-              russianSitesDirect: v,
-              domains: c.routing.domains,
-              excludedApps: c.routing.excludedApps,
-            ),
-          ),
-        ),
+        onChanged: c.routing.killSwitch
+            ? null
+            : (v) => act(
+                () => c.updateRouting(
+                  RoutingPolicy(
+                    russianSitesDirect: v,
+                    killSwitch: c.routing.killSwitch,
+                    domains: c.routing.domains,
+                    excludedApps: c.routing.excludedApps,
+                  ),
+                ),
+              ),
       ),
     ),
     Card(
@@ -540,7 +595,7 @@ class _FoxShellState extends State<FoxShell> {
         title: const Text('Исключения сайтов'),
         subtitle: Text('${c.routing.domains.length} доменов • VLESS'),
         trailing: const Icon(Icons.chevron_right),
-        onTap: domainDialog,
+        onTap: c.routing.killSwitch ? null : domainDialog,
       ),
     ),
     Card(
@@ -549,25 +604,54 @@ class _FoxShellState extends State<FoxShell> {
         title: const Text('Исключения приложений'),
         subtitle: Text('${c.routing.excludedApps.length} приложений • Android'),
         trailing: const Icon(Icons.chevron_right),
-        onTap: defaultTargetPlatform == TargetPlatform.android
+        onTap:
+            defaultTargetPlatform == TargetPlatform.android &&
+                !c.routing.killSwitch
             ? appsDialog
             : null,
       ),
     ),
     Card(
-      child: ListTile(
-        leading: const Icon(Icons.security_outlined),
-        title: const Text('Защита при обрыве'),
+      child: SwitchListTile(
+        title: const Text('Килл-свитч'),
         subtitle: const Text(
-          'Откройте настройки Android: постоянная VPN и блокировка без VPN. Совместимость зависит от движка; требует проверки на устройстве.',
+          'Защита применяется при подключении: все сайты и приложения через VPN, исключения временно не действуют. При обрыве интернет остаётся заблокированным до явного отключения защиты.',
         ),
-        onTap: defaultTargetPlatform == TargetPlatform.android
-            ? () => act(
-                () => AndroidEngine.channel.invokeMethod<void>('settings'),
-              )
-            : null,
+        value: c.routing.killSwitch,
+        onChanged: (v) => act(() async {
+          if (v && !await confirmProtection()) return;
+          await c.updateRouting(
+            RoutingPolicy(
+              russianSitesDirect: c.routing.russianSitesDirect,
+              domains: c.routing.domains,
+              excludedApps: c.routing.excludedApps,
+              killSwitch: v,
+            ),
+          );
+        }),
       ),
     ),
+    if (c.routing.killSwitch)
+      OutlinedButton.icon(
+        onPressed: () => act(
+          defaultTargetPlatform == TargetPlatform.android
+              ? () => AndroidEngine.channel.invokeMethod<void>('settings')
+              : c.disconnect,
+        ),
+        icon: const Icon(Icons.lock_open),
+        label: Text(
+          defaultTargetPlatform == TargetPlatform.android
+              ? 'Открыть системную блокировку Android'
+              : 'Отключить VPN и разрешить интернет',
+        ),
+      ),
+    if (defaultTargetPlatform == TargetPlatform.android)
+      TextButton(
+        onPressed: () =>
+            act(() => AndroidEngine.channel.invokeMethod<void>('settings')),
+        child: const Text('Системная блокировка Android'),
+      ),
+    updateCard(),
     Card(
       child: SwitchListTile(
         title: const Text('Отчёты о качестве'),
@@ -584,6 +668,209 @@ class _FoxShellState extends State<FoxShell> {
       style: const TextStyle(color: muted),
     ),
   ];
+  Future<bool> confirmProtection() async =>
+      await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Включить строгую защиту?'),
+          content: Text(
+            defaultTargetPlatform == TargetPlatform.android
+                ? 'После включения откройте настройки Android и включите «Постоянная VPN» и «Блокировать без VPN». FoxWay проверит системный статус. Исключения приложений и сайтов временно отключатся.'
+                : 'При сбое или закрытии приложения интернет может остаться заблокированным. Для снятия защиты используйте «Отключить VPN и разрешить интернет». На desktop нужны административные права. На macOS будут закрыты существующие сетевые соединения для применения строгих правил. Исключения временно отключатся.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('Отмена'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              child: const Text('Включить'),
+            ),
+          ],
+        ),
+      ) ??
+      false;
+
+  Widget updateCard() => Card(
+    child: Padding(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.system_update_outlined),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'Обновления • $appVersion',
+                  style: const TextStyle(fontWeight: FontWeight.w600),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            updates.available == null
+                ? (updates.checkedAt == null
+                      ? 'Автоматическая проверка при запуске и каждые 6 часов'
+                      : 'Новая версия пока не найдена')
+                : 'Доступна ${updates.available!.version}',
+          ),
+          if (updates.error != null)
+            Text(updates.error!, style: const TextStyle(color: muted)),
+          if (updates.downloading)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12),
+              child: LinearProgressIndicator(value: updates.progress),
+            ),
+          Wrap(
+            spacing: 12,
+            runSpacing: 8,
+            children: [
+              TextButton(
+                onPressed: updates.checking || updates.downloading
+                    ? null
+                    : () => act(updates.check),
+                child: Text(
+                  updates.checking ? 'Проверяем…' : 'Проверить сейчас',
+                ),
+              ),
+              if (updates.available != null)
+                FilledButton(
+                  onPressed: updates.downloading
+                      ? null
+                      : () => act(installUpdate),
+                  child: Text(
+                    defaultTargetPlatform == TargetPlatform.iOS
+                        ? 'Открыть канал установки'
+                        : 'Скачать обновление',
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            defaultTargetPlatform == TargetPlatform.iOS
+                ? 'Обновление iPhone устанавливается через App Store/TestFlight. Канал появится после подписанного выпуска.'
+                : 'Файл проверяется по SHA-256. Android откроет системный установщик; Windows/Linux предложат установку и перезапуск с откатом. На macOS пока открывается проверенный архив: автоматическая установка потребует подписанного канала.',
+            style: const TextStyle(color: muted),
+          ),
+        ],
+      ),
+    ),
+  );
+
+  Future<void> installUpdate() async {
+    final release = updates.available;
+    if (release == null) return;
+    if (Platform.isIOS) {
+      const store = String.fromEnvironment('IOS_UPDATE_URL');
+      if (store.isEmpty) {
+        throw StateError(
+          'Подписанный App Store/TestFlight выпуск ещё не настроен. Неподписанный .app не устанавливается как обновление.',
+        );
+      }
+      final url = Uri.parse(store);
+      if (url.scheme != 'https' ||
+          !['apps.apple.com', 'testflight.apple.com'].contains(url.host)) {
+        throw StateError('Неверный канал iOS');
+      }
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        throw StateError('Не удалось открыть магазин');
+      }
+      return;
+    }
+    final arch = Abi.current() == Abi.androidArm64
+        ? 'arm64'
+        : Abi.current() == Abi.androidArm
+        ? 'arm'
+        : 'x64';
+    final platform = Platform.isAndroid
+        ? 'android'
+        : Platform.isWindows
+        ? 'windows'
+        : Platform.isMacOS
+        ? 'macos'
+        : 'linux';
+    final asset = release.assetFor(platform, arch);
+    if (asset == null) throw StateError('Для этой платформы пока нет файла.');
+    final file = await updates.download(asset);
+    if (Platform.isAndroid) {
+      await AndroidEngine.channel.invokeMethod<void>('installUpdate', {
+        'path': file.path,
+      });
+    } else if (Platform.isMacOS) {
+      await Process.run('/usr/bin/open', ['-R', file.path]);
+    } else {
+      if (!mounted) return;
+      final approved =
+          await showDialog<bool>(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('Установить обновление?'),
+              content: const Text(
+                'FoxWay проверит и подготовит новый bundle, закроется и запустится снова. Настройки и подписки останутся в системном хранилище. Предыдущая версия сохранится рядом для отката. Если включён килл-свитч, блокировка сохранится до следующего подключения или явного снятия защиты.',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context, false),
+                  child: const Text('Позже'),
+                ),
+                FilledButton(
+                  onPressed: () => Navigator.pop(context, true),
+                  child: const Text('Установить и перезапустить'),
+                ),
+              ],
+            ),
+          ) ??
+          false;
+      if (!approved) return;
+      final folder = File(Platform.resolvedExecutable).parent;
+      final windows = Platform.isWindows;
+      final helper = File(
+        '${folder.path}/foxway-update.${windows ? 'ps1' : 'py'}',
+      );
+      final staged = await helper.copy(
+        '${file.parent.path}/foxway-update.${windows ? 'ps1' : 'py'}',
+      );
+      final process = await Process.start(
+        windows ? 'powershell.exe' : '/usr/bin/python3',
+        [
+          if (windows) ...['-NoProfile', '-ExecutionPolicy', 'Bypass', '-File'],
+          staged.path,
+          if (windows) '-Archive',
+          file.path,
+          if (windows) '-Digest',
+          updates.downloadedDigest!,
+          if (windows) '-Target',
+          folder.path,
+          if (windows) '-AppPid',
+          pid.toString(),
+        ],
+        mode: ProcessStartMode.detachedWithStdio,
+        workingDirectory: file.parent.path,
+      );
+      unawaited(process.stderr.drain<void>());
+      try {
+        await process.stdout
+            .transform(utf8.decoder)
+            .transform(const LineSplitter())
+            .where((s) => s.trim() == 'READY')
+            .first
+            .timeout(const Duration(seconds: 60));
+        await c.engine.stop();
+      } catch (_) {
+        process.kill();
+        throw StateError(
+          'Не удалось подготовить обновление. Приложение и данные не заменены.',
+        );
+      }
+      exit(0);
+    }
+  }
+
   Widget heading(String t) => Padding(
     padding: const EdgeInsets.only(bottom: 16),
     child: Text(
@@ -706,6 +993,7 @@ class _FoxShellState extends State<FoxShell> {
                   await c.updateRouting(
                     RoutingPolicy(
                       russianSitesDirect: c.routing.russianSitesDirect,
+                      killSwitch: c.routing.killSwitch,
                       domains: validateDomains(input.text),
                       excludedApps: c.routing.excludedApps,
                     ),
@@ -764,6 +1052,7 @@ class _FoxShellState extends State<FoxShell> {
                     await c.updateRouting(
                       RoutingPolicy(
                         russianSitesDirect: c.routing.russianSitesDirect,
+                        killSwitch: c.routing.killSwitch,
                         domains: c.routing.domains,
                         excludedApps: selected.toList(),
                       ),

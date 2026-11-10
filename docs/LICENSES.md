@@ -22,3 +22,5 @@ Hiddify не использован. [LICENSE.md](https://github.com/hiddify/hid
 ## Изменения 0.2.0
 
 Подключён sing_box 1.0.0 (GPL-3.0-or-later) для iOS Network Extension и официальный sing-box 1.14.4 для desktop. Собственный MIT-код совместим с GPL; условия распространения **собранного приложения, включающего GPL-компоненты, — GPL**, с соответствующими исходниками и build scripts. Запрета платных подписок GPL не содержит. Это не Hiddify. Пакет desktop core закреплён по URL/version и SHA-256 в scripts/sing_box_assets.json; Apple XCFramework проверяется по SHA в upstream Package.swift. Сборка corresponding-source bundle с ядрами, Go-модулями, Dart-плагинами и notices обязательна для релиза 0.2: [состав и команды](SOURCES.md). AWG Apple/Windows/Go — MIT, AWG tools — GPL-2.0, тексты сохранены.
+
+0.3: WFP ABI/rule helpers под MIT из pinned AmneziaWG Windows скопированы в native/windows-awg/guard с сохранением headers; изменения — FOXWAY_CHANGES.md. Собственные updater scripts и nft/PF orchestration — MIT. Native firewall implementation не является доказательством прошедшего security audit.

@@ -59,7 +59,10 @@ class AppleTunnelEngine implements TunnelEngine, ProxyProbeEngine {
       }
       await _init();
       await _native.stop();
-      await _awg.invokeMethod<void>('start', {'config': profile.config});
+      await _awg.invokeMethod<void>('start', {
+        'config': profile.config,
+        'killSwitch': policy.killSwitch,
+      });
       final deadline = DateTime.now().add(const Duration(seconds: 30));
       while (DateTime.now().isBefore(deadline)) {
         final stats =
@@ -87,6 +90,14 @@ class AppleTunnelEngine implements TunnelEngine, ProxyProbeEngine {
     if (!await _native.requestVpnPermission()) {
       throw StateError('Разрешение VPN не выдано');
     }
+    await _native.setServiceOptions(
+      SingBoxServiceOptions(
+        onDemand: policy.killSwitch,
+        includeAllNetworks: policy.killSwitch,
+        excludeLocalNetworks: !policy.killSwitch,
+        excludeApns: !policy.killSwitch,
+      ),
+    );
     await _native.start(config);
     final deadline = DateTime.now().add(const Duration(seconds: 30));
     while (_state != SingBoxConnectionStatus.connected) {
@@ -276,7 +287,12 @@ class DesktopTunnelEngine implements TunnelEngine, ProxyProbeEngine {
 
   @override
   Future<void> stop() async {
-    await Future.wait([_vless.stop(), _awg.stop()]);
+    await _vless.stop();
+    try {
+      await _awg.stop();
+    } catch (_) {
+      if (identical(_active, _awg) || !Platform.isMacOS) rethrow;
+    }
     _active = null;
   }
 

@@ -4,18 +4,24 @@ import 'package:flutter_v2ray/flutter_v2ray.dart';
 class RoutingPolicy {
   const RoutingPolicy({
     this.russianSitesDirect = true,
+    this.killSwitch = false,
     this.domains = const [],
     this.excludedApps = const [],
   });
-  final bool russianSitesDirect;
+  final bool russianSitesDirect, killSwitch;
+  RoutingPolicy get enforced => killSwitch
+      ? const RoutingPolicy(russianSitesDirect: false, killSwitch: true)
+      : this;
   final List<String> domains, excludedApps;
   Map<String, dynamic> toJson() => {
     'russianSitesDirect': russianSitesDirect,
+    'killSwitch': killSwitch,
     'domains': domains,
     'excludedApps': excludedApps,
   };
   factory RoutingPolicy.fromJson(Map<String, dynamic> j) => RoutingPolicy(
     russianSitesDirect: j['russianSitesDirect'] != false,
+    killSwitch: j['killSwitch'] == true,
     domains: List<String>.from(j['domains'] ?? []),
     excludedApps: List<String>.from(j['excludedApps'] ?? []),
   );

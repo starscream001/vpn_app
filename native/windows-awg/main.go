@@ -5,12 +5,14 @@
 package main
 
 import (
+	"app.foxway/windows-awg/guard"
 	"bufio"
 	"bytes"
 	"crypto/sha256"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/amnezia-vpn/amneziawg-windows/v3/tunnel/winipcfg"
 	"io"
 	"log"
 	"os"
@@ -248,6 +250,62 @@ func stats(name string) map[string]any {
 	result["tx"] = tx
 	return result
 }
+func guardPaths(folder string) ([]string, error) {
+	if e := protectedDir(folder); e != nil {
+		return nil, e
+	}
+	source, e := os.Executable()
+	if e != nil {
+		return nil, e
+	}
+	data, e := os.ReadFile(source)
+	if e != nil {
+		return nil, e
+	}
+	target := filepath.Join(folder, "foxway-awg.exe")
+	if !strings.EqualFold(source, target) {
+		if e = writeBinary(target, data); e != nil {
+			return nil, e
+		}
+	}
+	return []string{target, filepath.Join(filepath.Dir(source), "sing-box.exe")}, nil
+}
+func guardBind(name, folder string, bind bool) error {
+	paths, e := guardPaths(folder)
+	if e != nil {
+		return e
+	}
+	var luid uint64
+	if bind {
+		var input struct {
+			Protocol string `json:"protocol"`
+		}
+		if e = json.NewDecoder(io.LimitReader(os.Stdin, 1024)).Decode(&input); e != nil {
+			return e
+		}
+		expected := "FoxWayVless"
+		if input.Protocol == "amnezia" {
+			expected = name
+		} else if input.Protocol != "vless" {
+			return errors.New("invalid protocol")
+		}
+		adapters, e := winipcfg.GetAdaptersAddresses(windows.AF_UNSPEC, winipcfg.GAAFlagDefault)
+		if e != nil {
+			return e
+		}
+		for _, a := range adapters {
+			if a.FriendlyName() == expected {
+				luid = uint64(a.LUID)
+				break
+			}
+		}
+		if luid == 0 {
+			return errors.New("own TUN not found")
+		}
+	}
+	return guard.Arm(paths, luid)
+}
+
 func run() error {
 	if len(os.Args) < 2 {
 		return errors.New("missing command")
@@ -275,6 +333,18 @@ func run() error {
 		return e
 	}
 	switch os.Args[1] {
+	case "guard-arm":
+		return guardBind(name, folder, false)
+	case "guard-bind":
+		return guardBind(name, folder, true)
+	case "guard-off":
+		return guard.Disarm()
+	case "guard-status":
+		armed, e := guard.Armed()
+		if e != nil {
+			return e
+		}
+		return json.NewEncoder(os.Stdout).Encode(map[string]bool{"armed": armed})
 	case "up":
 		return up(name, folder)
 	case "down":

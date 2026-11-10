@@ -39,6 +39,16 @@ class AndroidEngine implements TunnelEngine, ProxyProbeEngine {
         'VPN пока подключён только на Android. Эта платформа — предварительная сборка.',
       );
     }
+    if (policy.killSwitch) {
+      final status =
+          await channel.invokeMapMethod<String, dynamic>('protectionStatus') ??
+          {};
+      if (status['lockdown'] != true) {
+        throw UnsupportedError(
+          'Включите постоянную VPN и «Блокировать без VPN» в настройках Android; затем повторите подключение.',
+        );
+      }
+    }
     await stop();
     if (profile.protocol == Protocol.amnezia) {
       if (policy.domains.isNotEmpty) {
