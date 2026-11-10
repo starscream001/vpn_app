@@ -762,7 +762,18 @@ class _FoxShellState extends State<FoxShell> {
     ),
   );
 
+  bool _installing = false;
   Future<void> installUpdate() async {
+    if (_installing) return;
+    setState(() => _installing = true);
+    try {
+      await _performInstallUpdate();
+    } finally {
+      if (mounted) setState(() => _installing = false);
+    }
+  }
+
+  Future<void> _performInstallUpdate() async {
     final release = updates.available;
     if (release == null) return;
     if (Platform.isIOS) {
@@ -860,7 +871,11 @@ class _FoxShellState extends State<FoxShell> {
             .where((s) => s.trim() == 'READY')
             .first
             .timeout(const Duration(seconds: 60));
-        await c.engine.stop();
+        final readyAt = DateTime.now();
+        await c.stopForUpdate();
+        if (DateTime.now().difference(readyAt) > const Duration(seconds: 100)) {
+          throw StateError('Installer preparation timed out');
+        }
       } catch (_) {
         process.kill();
         throw StateError(

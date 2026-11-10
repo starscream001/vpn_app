@@ -186,6 +186,28 @@ void main() {
       restored.dispose();
     },
   );
+  test(
+    'Update shutdown saves profiles and stops without disarming protection',
+    () async {
+      final guard = FakeGuard();
+      final vault = MemoryVault();
+      final c = FoxController(
+        store: StateStore(vault),
+        engine: ProtectedEngine(FakeEngine(), guard: guard),
+        probe: FakeProbe([true]),
+      );
+      await c.init();
+      await c.importText(link.replaceFirst('example.com', '127.0.0.1'));
+      await c.updateRouting(const RoutingPolicy(killSwitch: true));
+      await c.connect();
+      expect(c.active, isNotNull);
+      await c.stopForUpdate();
+      expect(c.active, isNull);
+      expect(guard.events, isNot(contains('off')));
+      expect((await StateStore(vault).load())['profiles'], hasLength(1));
+      c.dispose();
+    },
+  );
   test('AWG subscription expiry applies to raw configuration too', () {
     final expiry = DateTime.utc(2030);
     expect(

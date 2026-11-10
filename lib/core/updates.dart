@@ -7,7 +7,7 @@ import 'package:flutter/foundation.dart';
 const appVersion = '0.3.0-preview.1';
 const releaseRepository = 'starscream001/vpn_app';
 
-/// Semver comparison includes prerelease precedence; a preview never replaces stable.
+/// Semver comparison includes numeric prerelease precedence and ignores build metadata.
 int compareVersions(String a, String b) {
   List<String> parts(String s) =>
       s.replaceFirst(RegExp(r'^v'), '').split('+').first.split('-');

@@ -358,6 +358,27 @@ class FoxController extends ChangeNotifier {
     }
   }
 
+  Future<void> stopForUpdate() async {
+    if (!ready || _busy || _polling) {
+      throw StateError(
+        'Дождитесь окончания подключения или проверки и повторите обновление',
+      );
+    }
+    _busy = true;
+    _session++;
+    try {
+      // Keep persistent protection, but serialize the final vault write before exit.
+      await engine.stop();
+      active = null;
+      traffic = const Traffic(0, 0, false);
+      state = ConnectionState.disconnected;
+      await save();
+    } finally {
+      _busy = false;
+      notifyListeners();
+    }
+  }
+
   Future<void> disconnect({bool releaseProtection = true}) async {
     if (_busy) return;
     _session++;

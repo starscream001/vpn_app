@@ -1,4 +1,4 @@
-# Corresponding sources for FoxWay 0.2 preview
+# Corresponding sources for FoxWay preview
 
 FoxWay's original code is MIT. Combined binaries incorporating GPL components are distributed under the applicable GPL terms; see LICENSE-gpl3.txt and each upstream notice. FoxWay is not affiliated with SagerNet, Amnezia or Hiddify.
 
