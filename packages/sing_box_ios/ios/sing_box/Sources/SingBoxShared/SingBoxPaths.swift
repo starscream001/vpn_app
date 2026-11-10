@@ -1,4 +1,5 @@
 import Foundation
+import Security
 import os
 
 /// File locations shared by the app and the Packet Tunnel extension.
@@ -8,7 +9,7 @@ import os
 /// | libbox base path (`command.sock`) | app group container |
 /// | libbox working path | `<container>/sing-box` |
 /// | libbox temp path | `<container>/Library/Caches/sing-box` |
-/// | last config | `<working>/config.json` |
+/// | last config | shared Keychain (FoxWay modification) |
 /// | last start/stop error | `<working>/last_error` |
 public struct SingBoxPaths {
     private static let logger = Logger(subsystem: "sing_box", category: "Paths")
@@ -84,16 +85,40 @@ public struct SingBoxPaths {
 
     // MARK: Configuration
 
+    // FoxWay: share credentials through Keychain, never a plaintext group file.
+    private var configQuery: [String: Any]? {
+        guard let group = Bundle.main.object(forInfoDictionaryKey: "FoxWayKeychainGroup") as? String else { return nil }
+        return [kSecClass as String: kSecClassGenericPassword,
+                kSecAttrService as String: "FoxWay.VLESS",
+                kSecAttrAccount as String: appGroup,
+                kSecAttrAccessGroup as String: group]
+    }
+
     public func readConfig() -> String? {
-        guard let data = try? Data(contentsOf: configFile) else {
-            return nil
-        }
+        guard var query = configQuery else { return nil }
+        query[kSecReturnData as String] = true
+        var item: CFTypeRef?
+        guard SecItemCopyMatching(query as CFDictionary, &item) == errSecSuccess,
+              let data = item as? Data else { return nil }
         return String(data: data, encoding: .utf8)
     }
 
     public func writeConfig(_ config: String) throws {
-        try createDirectories()
-        try Data(config.utf8).write(to: configFile, options: [.atomic])
+        guard let query = configQuery else {
+            throw NSError(domain: "FoxWay.Keychain", code: 1)
+        }
+        let attributes: [String: Any] = [kSecValueData as String: Data(config.utf8),
+            kSecAttrAccessible as String: kSecAttrAccessibleAfterFirstUnlockThisDeviceOnly]
+        var status = SecItemUpdate(query as CFDictionary, attributes as CFDictionary)
+        if status == errSecItemNotFound {
+            status = SecItemAdd(query.merging(attributes) { _, new in new } as CFDictionary, nil)
+        }
+        guard status == errSecSuccess else {
+            throw NSError(domain: "FoxWay.Keychain", code: Int(status))
+        }
+        // Remove any config left by an older upstream plugin implementation.
+        try? FileManager.default.removeItem(at: configFile)
+        writeLastError(nil)
     }
 
     // MARK: Last error
@@ -115,6 +140,7 @@ public struct SingBoxPaths {
             return
         }
         try? createDirectories()
-        try? Data(message.utf8).write(to: lastErrorFile, options: [.atomic])
+        // Native parser errors may contain credentials; persist only a generic marker.
+        try? Data("VPN native error".utf8).write(to: lastErrorFile, options: [.atomic])
     }
 }

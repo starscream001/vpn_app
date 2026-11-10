@@ -71,7 +71,7 @@ open class SingBoxPacketTunnelProvider: NEPacketTunnelProvider {
             throw SingBoxError("app group is not configured")
         }
         guard let config = paths.readConfig(), !config.isEmpty else {
-            throw SingBoxError("missing configuration: \(paths.configFile.path) does not exist; start the VPN from the app first")
+            throw SingBoxError("missing protected configuration; start the VPN from the app first")
         }
         return config
     }

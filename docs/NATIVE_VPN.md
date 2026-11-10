@@ -13,7 +13,7 @@
 ## Передача конфигурации
 
 - Desktop VLESS: официальный sing-box 1.14.4, URL и SHA-256 закреплены; конфигурация через stdin, без ключей в командной строке или файлах. Loopback Clash API защищён случайным секретом. HTTPS-проба принудительно идёт через отдельный proxy inbound.
-- Apple AWG: отдельный процесс расширения исключает конфликт двух Go runtimes. Конфигурация в общем Keychain, в NE preferences только account ID; расширение возвращает только счётчики. Предыдущая default Keychain access group сохранена первой для обновлений vault.
+- Apple VLESS и AWG: отдельный процесс расширения исключает конфликт двух Go runtimes. Конфигурация в общем Keychain, в NE preferences только account ID; расширение возвращает только счётчики. Предыдущая default Keychain access group сохранена первой для обновлений vault.
 - Windows AWG: собственный короткоживущий helper вызывает официальный upstream service. Профиль зашифрован Windows DPAPI machine scope в каталоге Program Files с доступом SYSTEM/Administrators. Сервис создаётся с demand start, имя привязано к пользователю, executable размещается в защищённом каталоге версии. Hooks из импортированных конфигов запрещены. Полный GUI в этом preview запрашивает административные права; разделение прав через подписанный broker остаётся следующим этапом.
 - Linux AWG: только stdin и собственное имя интерфейса `fw` + hash UID; raw-конфиги на диск не записываются. Hooks и SaveConfig запрещены. Используется системный диалог pkexec для awg-quick; требуются iproute2, resolvconf, iptables или nftables, polkit/pkexec и /dev/net/tun. Бинарники AWG поставляются в bundle. Не запускайте несколько VPN одновременно: upstream route/DNS scripts не обеспечивают изоляцию произвольных сторонних VPN.
 
