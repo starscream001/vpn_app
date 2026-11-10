@@ -1,14 +1,14 @@
-# FoxWay 0.3 — проверенные результаты
+# FoxWay 0.3.1 — проверенные результаты
 
-Дата: 10 ноября 2026. Проверенный source commit: `ad803c7d9bc8df3a1904cc3cef8e3b45e2efcede`.
-[GitHub Actions 42800991614](https://github.com/starscream001/vpn_app/actions/runs/42800991614): **success**, все семь jobs и загрузка артефактов успешны. Приложение и build workflow в коммите публикации не изменяются; release job проверяет это автоматически.
+Дата: 10 ноября 2026. Проверенный source commit: `07b053b4389ee26780369d7c88109d6d981ee5f7`.
+[GitHub Actions 42897599045](https://github.com/starscream001/vpn_app/actions/runs/42897599045): **success**, все семь jobs и загрузка артефактов успешны. Приложение и build workflow в коммите публикации не изменяются; release job проверяет это автоматически.
 
 ## Результаты
 
 | Проверка | Результат |
 |---|---|
 | Dart format / Flutter analyze | PASS, без замечаний |
-| Flutter tests | **49 PASS** |
+| Flutter tests | **59 PASS** |
 | Python API/firewall/updater tests | **16 PASS** |
 | Официальный sing-box 1.14.4 `check` | PASS, iOS и desktop fixtures |
 | Native loopback routing | PASS для обеих fixtures: .ru direct; другие домены и forced quality probes не переходят в direct при отказе proxy |
@@ -21,17 +21,26 @@
 
 ## Артефакты точного source commit
 
-- [Android APK/AAB](https://github.com/starscream001/vpn_app/actions/runs/42800991614/artifacts/13756113182)
-- [iOS unsigned](https://github.com/starscream001/vpn_app/actions/runs/42800991614/artifacts/13757265912)
-- [Windows](https://github.com/starscream001/vpn_app/actions/runs/42800991614/artifacts/13757290579)
-- [Linux](https://github.com/starscream001/vpn_app/actions/runs/42800991614/artifacts/13755577739)
-- [macOS](https://github.com/starscream001/vpn_app/actions/runs/42800991614/artifacts/13757410942)
-- [Corresponding sources](https://github.com/starscream001/vpn_app/actions/runs/42800991614/artifacts/13755997290)
-- [Coverage и UI captures](https://github.com/starscream001/vpn_app/actions/runs/42800991614/artifacts/13755986853)
+- [Android APK/AAB](https://github.com/starscream001/vpn_app/actions/runs/42897599045/artifacts/13801238186)
+- [iOS unsigned](https://github.com/starscream001/vpn_app/actions/runs/42897599045/artifacts/13800733419)
+- [Windows](https://github.com/starscream001/vpn_app/actions/runs/42897599045/artifacts/13800024985)
+- [Linux](https://github.com/starscream001/vpn_app/actions/runs/42897599045/artifacts/13802155605)
+- [macOS](https://github.com/starscream001/vpn_app/actions/runs/42897599045/artifacts/13802011739)
+- [Corresponding sources](https://github.com/starscream001/vpn_app/actions/runs/42897599045/artifacts/13800853600)
+- [Coverage и UI captures](https://github.com/starscream001/vpn_app/actions/runs/42897599045/artifacts/13800937861)
 
 Постоянные public assets и SHA256SUMS: [Releases](https://github.com/starscream001/vpn_app/releases). Actions artifacts имеют срок хранения. Предыдущий [0.2 preview](https://github.com/starscream001/vpn_app/releases/tag/v0.2.0-preview.1) сохранён.
 
-## Что проверяют новые тесты
+## Исправления 0.3.1
+
+- Вставка HTTPS-ссылки загружает и сохраняет подписку, показывает число серверов и expiry при наличии заголовка. Повторный импорт не дублирует источник; сбой обновления сохраняет старые серверы.
+- Ограниченные HTTPS-перенаправления, base64 с переносами и BOM, понятные ошибки без секретных URL/ответов, блокировка повторной отправки, корректное закрытие окна импорта.
+- Отмена подключения во время native start и проверки, игнорирование позднего результата, повторная остановка поздно запущенного туннеля. На Android остановка обоих движков и отмена ожидающего разрешения AWG. Это проверено моделированием задержек и сборкой Android, без физического устройства.
+- Новые проверки: 6 тестов импорта/сохранения, 2 теста отмены в контроллере, 3 сценария интерфейса. Всего 59 Flutter и 16 Python тестов.
+
+[Механика импорта](SUBSCRIPTIONS.md).
+
+## Что проверяют тесты
 
 - Semver/prerelease precedence; отказ чужим update URLs, HTTP и опасным asset names; выбор platform assets.
 - Смешанная подписка существующего бота, пропуск несовместимых профилей, expiry raw AWG и VLESS, сохранение источников в vault.

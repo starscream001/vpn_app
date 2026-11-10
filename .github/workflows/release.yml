@@ -15,13 +15,13 @@ jobs:
     runs-on: ubuntu-24.04
     env:
       GH_TOKEN: ${{ github.token }}
-      VERSION: v0.3.0-preview.1
-      SOURCE_SHA: ad803c7d9bc8df3a1904cc3cef8e3b45e2efcede
+      VERSION: v0.3.1-preview.1
+      SOURCE_SHA: 07b053b4389ee26780369d7c88109d6d981ee5f7
     steps:
       - uses: actions/checkout@v4
       - name: Verify source CI succeeded
         run: |
-          gh api repos/${{ github.repository }}/actions/runs/42800991614 > run.json
+          gh api repos/${{ github.repository }}/actions/runs/42897599045 > run.json
           python3 -c 'import json,os; r=json.load(open("run.json")); assert r["conclusion"] == "success" and r["head_sha"] == os.environ["SOURCE_SHA"]'
       - name: Verify publication commit contains the identical tested application
         run: |
@@ -30,7 +30,7 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           github-token: ${{ github.token }}
-          run-id: 42800991614
+          run-id: 42897599045
           path: release-input
       - run: python3 scripts/package_release.py
       - name: Publish prerelease
@@ -39,4 +39,4 @@ jobs:
             echo "Release already exists; refusing to replace published files"
             exit 1
           fi
-          gh release create "$VERSION" --target "$GITHUB_SHA" --prerelease --title "FoxWay VPN 0.3.0 — updates and session protection preview" --notes-file docs/RELEASE_NOTES.md release-output/*
+          gh release create "$VERSION" --target "$GITHUB_SHA" --prerelease --title "FoxWay VPN 0.3.1 — subscription import and cancellable connection" --notes-file docs/RELEASE_NOTES.md release-output/*

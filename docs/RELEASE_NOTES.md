@@ -1,17 +1,17 @@
-FoxWay VPN 0.3 preview — обновления приложения, session kill switch и существующая Telegram-подписка.
+# FoxWay VPN 0.3.1 preview — подписка по VPN-ссылке
 
-Что добавлено:
-- Новый README со скриншотами, матрицей платформ и пользовательскими инструкциями.
-- @Ilyavpnadmin_bot → прежняя HTTPS-ссылка → импорт в FoxWay. Автообновление списка раз в 15 минут, mixed feed/expiry/cache. Сам бот и VPN-серверы не изменялись.
-- Проверка GitHub Releases при запуске и раз в 6 часов, Semver, allowlist URL и SHA-256. Android installer сверяет signer; Windows/Linux — staged bundle replacement после подтверждения, предыдущая версия для отката. macOS пока загружает проверенный архив; iOS требует App Store/TestFlight.
-- Strict session protection: Android OS lockdown, Apple NE options/On Demand, persistent Windows WFP, Linux nft, macOS PF. Неудачная проверка не снимает desktop guard; исключения временно не применяются. На Apple строгий режим не меняет provider автоматически.
+Проверено: **59 Flutter + 16 Python тестов**, анализ кода без замечаний, все 7 jobs [42897599045](https://github.com/starscream001/vpn_app/actions/runs/42897599045) успешны. Бинарники собраны из `07b053b4389ee26780369d7c88109d6d981ee5f7`; коммит публикации меняет только документацию и release workflow.
 
-Проверено: 49 Flutter + 16 Python tests, native config/routing smoke, сборки Android/iOS/Windows/macOS/Linux, corresponding-source archive. Все 7 jobs run 42800991614 успешны. Бинарники собраны из ad803c7d9bc8df3a1904cc3cef8e3b45e2efcede; тег дополнительно включает только документацию и release workflow, совпадение приложения проверяется перед публикацией.
+Вставьте HTTPS-ссылку из бота во вкладке «Подписка» и нажмите «Добавить». Приложение загрузит совместимые серверы, покажет их число и срок действия (если он передан провайдером), сохранит ссылку и будет обновлять серверы каждые 15 минут при работающем приложении. Повторная вставка обновляет существующую подписку без дубликатов.
 
-Для современного Android: app-arm64-v8a-release.apk. **Подпись пока тестовая**; постоянный ключ ещё не сохранён в GitHub Secrets. Старые preview APK могут иметь несовместимый signer, автоматической очистки данных нет. Для надёжных обновлений нужен один постоянный signing key и возрастающий build number.
+Исправлена остановка во время запуска и проверки: доступна явная отмена, поздний результат не подключает VPN снова, поздний native start завершается повторной остановкой. На Android остановка запрашивается у обоих движков, отменённое разрешение AWG не запускает туннель.
 
-**Это preview, не подтверждённый security release.** Реальный VPN и kill-core/GUI leak checks на устройствах не выполнялись; WFP/nft/PF не применялись к компьютеру пользователя. Для Apple нет account/provisioning: unsigned .app не является установочным IPA/TestFlight, macOS ad-hoc не заменяет Developer ID/notarization. Нужны права/зависимости для desktop; macOS PF требует стандартный layout и при активации закрывает существующие соединения. Boot-time protection, полный process supervisor, crash/power-loss recovery установщика и signed production updater ещё требуют доработки/стенда.
+Исправлены безопасные HTTPS-перенаправления и base64 с переносами/BOM. Добавлены объяснения для закрытой/удалённой подписки, пустого ответа, HTML, таймаута, TLS и ошибок сервера; секретные ссылки и ключи в ошибки не попадают. Во время загрузки повторная отправка блокируется. Исправлена ошибка закрытия окна импорта.
 
-Новый bearer API/quality collector не развёрнут. Действующая подписка бота работает через прежние ссылки и сама по себе не включает отправку отчётов.
+Форматы: VLESS TCP Reality/TLS и AmneziaWG `.conf`, plain/base64 HTTPS-подписки. JSON, WS/gRPC/XHTTP, Hysteria2 и `vpn://` пока не поддерживаются. Вставка использует уже выданный доступ; покупка, выдача новых прав и продление остаются у Telegram-бота. Наличие профиля не подтверждает работоспособность VPN.
 
-SHA256SUMS, исходники зависимостей/ядер (~1.13 GB) и notices входят в релиз. Все возможности, восстановление сети и ограничения: https://github.com/starscream001/vpn_app/blob/main/docs/VALIDATION.md
+Для обычного современного Android скачайте **app-arm64-v8a-release.apk**. Если архитектура неизвестна, **app-release.apk** — универсальная сборка. Подпись остаётся тестовой по выбранному режиму; signer старого preview может отличаться, автоматической очистки данных нет.
+
+Apple-сборки неподписанные; для установки VPN-расширения на iPhone нужен Apple Developer account и provisioning. macOS — проверенный архив без автоматической установки. Kill switch и реальные туннели не проверялись на устройствах; действующие VPN-серверы и сетевые настройки компьютера не изменялись.
+
+Сборки всех пяти платформ, исходники зависимостей/ядер, notices и SHA256SUMS публикуются из одного проверенного запуска. Точные результаты: [VALIDATION.md](https://github.com/starscream001/vpn_app/blob/main/docs/VALIDATION.md). Механика импорта: [SUBSCRIPTIONS.md](https://github.com/starscream001/vpn_app/blob/main/docs/SUBSCRIPTIONS.md).
