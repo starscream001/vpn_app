@@ -3,6 +3,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'package:sing_box/sing_box.dart';
+import 'package:flutter/services.dart';
 import 'package:sing_box/sing_box_platform_interface.dart';
 import 'engine.dart';
 import 'profile.dart';
@@ -16,6 +17,8 @@ TunnelEngine platformEngine() => Platform.isAndroid
     : DesktopTunnelEngine();
 
 class AppleTunnelEngine implements TunnelEngine {
+  static const _awg = MethodChannel("app.foxway/apple-awg");
+  Protocol? _activeProtocol;
   final _native = SingBoxPlatform.instance;
   bool _initialized = false;
   SingBoxConnectionStatus _state = SingBoxConnectionStatus.disconnected;
@@ -42,8 +45,31 @@ class AppleTunnelEngine implements TunnelEngine {
 
   @override
   Future<void> start(Profile profile, RoutingPolicy policy) async {
+    if (profile.protocol == Protocol.amnezia) {
+      if (policy.domains.isNotEmpty || policy.excludedApps.isNotEmpty) {
+        throw UnsupportedError(
+          'AmneziaWG iOS: доменные и app-исключения пока не доступны',
+        );
+      }
+      await _init();
+      await _native.stop();
+      await _awg.invokeMethod<void>('start', {'config': profile.config});
+      final deadline = DateTime.now().add(const Duration(seconds: 30));
+      while (DateTime.now().isBefore(deadline)) {
+        final stats =
+            await _awg.invokeMapMethod<String, dynamic>('stats') ?? {};
+        if (stats['up'] == true) {
+          _activeProtocol = Protocol.amnezia;
+          return;
+        }
+        await Future<void>.delayed(const Duration(milliseconds: 200));
+      }
+      await _awg.invokeMethod<void>('stop');
+      throw TimeoutException('AmneziaWG extension не запустился');
+    }
     final config = singConfig(profile, policy);
     await _init();
+    await _awg.invokeMethod<void>('stop');
     if (!await _native.requestVpnPermission()) {
       throw StateError('Разрешение VPN не выдано');
     }
@@ -56,18 +82,32 @@ class AppleTunnelEngine implements TunnelEngine {
       }
       await Future<void>.delayed(const Duration(milliseconds: 200));
     }
+    _activeProtocol = Protocol.vless;
   }
 
   @override
-  Future<Traffic> traffic() async => Traffic(
-    _stats.downloadTotal,
-    _stats.uploadTotal,
-    _state == SingBoxConnectionStatus.connected,
-  );
+  Future<Traffic> traffic() async {
+    if (_activeProtocol == Protocol.amnezia) {
+      final s = await _awg.invokeMapMethod<String, dynamic>('stats') ?? {};
+      return Traffic(
+        (s['rx'] as num? ?? 0).toInt(),
+        (s['tx'] as num? ?? 0).toInt(),
+        s['up'] == true,
+      );
+    }
+    return Traffic(
+      _stats.downloadTotal,
+      _stats.uploadTotal,
+      _state == SingBoxConnectionStatus.connected,
+    );
+  }
+
   @override
   Future<void> stop() async {
     await _init();
     await _native.stop();
+    await _awg.invokeMethod<void>('stop');
+    _activeProtocol = null;
   }
 
   Future<void> dispose() async {

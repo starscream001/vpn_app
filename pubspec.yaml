@@ -9,7 +9,8 @@ dependencies:
     sdk: flutter
   flutter_v2ray: 2.0.0
   flutter_secure_storage: ^9.2.4
-  sing_box: 1.0.0
+  sing_box:
+    path: packages/sing_box_ios
   crypto: ^3.0.6
   file_selector: ^1.0.3
   url_launcher: ^6.3.1

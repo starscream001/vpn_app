@@ -459,10 +459,9 @@ packages:
   sing_box:
     dependency: "direct main"
     description:
-      name: sing_box
-      sha256: "1eeae0530960d000817d0d7673791223525c88d083ff665be0b996ab3675b7a1"
-      url: "https://pub.dev"
-    source: hosted
+      path: "packages/sing_box_ios"
+      relative: true
+    source: path
     version: "1.0.0"
   sky_engine:
     dependency: transitive

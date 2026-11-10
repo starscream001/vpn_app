@@ -56,3 +56,7 @@ app.*.map.json
 *.mobileprovision
 key.properties
 __pycache__/
+
+# Native bridge build products
+native/amnezia-apple/Sources/WireGuardKitGo/out/
+native/amnezia-apple/Sources/WireGuardKitGo/.tmp/

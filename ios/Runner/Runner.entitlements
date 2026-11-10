@@ -10,5 +10,9 @@
 	<array>
 		<string>group.app.foxway.foxway</string>
 	</array>
+	<key>keychain-access-groups</key>
+	<array>
+		<string>$(AppIdentifierPrefix)app.foxway.shared</string>
+	</array>
 </dict>
 </plist>

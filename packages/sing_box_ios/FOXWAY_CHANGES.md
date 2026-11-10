@@ -1,0 +1,1 @@
+Vendored from sing_box 1.0.0, https://pub.dev/packages/sing_box/versions/1.0.0 (GPL-3.0-or-later). Native Android registration intentionally removed: that unused Go runtime conflicts with the existing Android Xray gomobile runtime. iOS/Dart sources unchanged; retained LICENSE and THIRD_PARTY_NOTICES.

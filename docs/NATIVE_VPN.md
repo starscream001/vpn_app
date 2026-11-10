@@ -17,10 +17,14 @@
 
 ## Оставшиеся протоколы
 
-AmneziaWG 2.0 на iOS/desktop **не реализован**. Vanilla sing-box WireGuard не является AWG. Native adapter явно отклоняет AWG; Авто может выбрать доступный VLESS. Следующий отдельный шаг — официальный amneziawg-apple/WireGuardKitGo и AWG backend для desktop с проверкой полей S/H/I.
+iOS: добавлен отдельный AWGPacketTunnel target с официальным amneziawg-apple (pinned upstream 9d5ee60edefa95b933a738dd7cda671dd18021fc). Отдельный Go runtime, WgQuick parser с S/H/I, shared Keychain для ключей, только account ID в VPN preferences, сообщения расширению возвращают лишь счётчики. Native сборка и работа на устройстве ещё требуют проверки.
+
+AmneziaWG на desktop **не реализован**. Vanilla sing-box WireGuard не является AWG. Desktop adapter явно отклоняет AWG; Авто может выбрать VLESS. Остаётся AWG backend/helper с управлением правами.
 
 ## Проверки
 
 Локально: 33 Flutter tests проходят, формат и analyzer проверяются; официальный sing-box 1.14.4 успешно выполнил `check` для desktop и iOS JSON fixtures. Команда check не запускает VPN и не меняет маршруты компьютера. Полные native сборки выполняются в GitHub Actions. Действующие VPN-серверы не трогаются.
 
 До релиза нужны: tests реального TUN на отдельном стенде, DNS/IPv6, рассыпание сети, reconnect/revoke, права и native supervisor, Apple signing/device validation, аудит iOS shared container protection и GPL corresponding sources. Старый релиз 0.1.0 не заменяется непроверенными сборками.
+
+Плагин sing_box vendored в packages/sing_box_ios с регистрацией только iOS: неиспользуемая Android часть создавала конфликт gomobile go.Seq с существующим Xray. iOS исходники сохранены, лицензия и notices включены.

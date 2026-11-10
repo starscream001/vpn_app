@@ -228,7 +228,7 @@ class _FoxShellState extends State<FoxShell> {
                                   child: Padding(
                                     padding: EdgeInsets.all(16),
                                     child: Text(
-                                      'Экспериментальный VLESS VPN. iOS требует подписанного расширения; desktop — прав на TUN. AmneziaWG на этих платформах ещё не доступен.',
+                                      'Экспериментальные native-туннели: iOS требует подписи расширений, desktop — прав на TUN. Поддержка протоколов зависит от платформы.',
                                     ),
                                   ),
                                 ),
